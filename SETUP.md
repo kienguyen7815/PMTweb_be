@@ -23,14 +23,34 @@ DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_password_here
 DB_NAME=taskhub_db
+DB_CONNECTION_LIMIT=10
+DB_ACQUIRE_TIMEOUT=60000
+DB_TIMEOUT=60000
+DB_MAX_IDLE=10
+DB_IDLE_TIMEOUT=30000
 
 # JWT Configuration
 JWT_SECRET=your_jwt_secret_key_here_change_in_production
 JWT_EXPIRE=7d
 
 # Server Configuration
-PORT=5000
+PORT=3036
 NODE_ENV=development
+FRONTEND_URL=http://localhost:3000
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX=100
+
+# Body Size Limit
+BODY_SIZE_LIMIT=10mb
+
+# Authentication Cache
+AUTH_CACHE_TTL=300000
+AUTH_CACHE_MAX_SIZE=100
+
+# Bcrypt Configuration
+BCRYPT_ROUNDS=10
 ```
 
 #### Tạo database và tables:
@@ -49,7 +69,7 @@ mysql -u root -p taskhub_db < database/init.sql
 npm run dev
 ```
 
-Server sẽ chạy tại: http://localhost:5000
+Server sẽ chạy tại: http://localhost:3036
 
 ## API Endpoints
 

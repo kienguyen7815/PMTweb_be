@@ -93,11 +93,57 @@ const validateUpdateProfile = [
     .matches(/^[a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF\s]+$/)
     .withMessage('Tên người dùng chỉ được chứa chữ cái, số, dấu gạch dưới và khoảng trắng'),
 
+  body('email')
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage('Email không hợp lệ')
+    .normalizeEmail(),
+
   body('phone')
     .optional()
     .trim()
     .matches(/^[0-9]{10,11}$/)
     .withMessage('Số điện thoại phải có 10-11 chữ số'),
+
+  body('id_card')
+    .optional()
+    .trim()
+    .matches(/^[0-9]{9,12}$/)
+    .withMessage('Căn cước công dân phải có 9-12 chữ số'),
+
+  body('address')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Địa chỉ không được quá 500 ký tự'),
+
+  body('date_of_birth')
+    .optional()
+    .matches(/^\d{4}-\d{2}-\d{2}$/)
+    .withMessage('Ngày sinh phải có định dạng YYYY-MM-DD'),
+
+  body('gender')
+    .optional()
+    .isIn(['Nam', 'Nữ', 'Không muốn tiết lộ'])
+    .withMessage('Giới tính không hợp lệ'),
+
+  body('marital_status')
+    .optional()
+    .isIn(['Độc thân', 'Đã kết hôn', 'Đã ly hôn', 'Góa chồng', 'Góa vợ'])
+    .withMessage('Tình trạng hôn nhân không hợp lệ'),
+
+  body('ethnicity')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Dân tộc không được quá 50 ký tự'),
+
+  body('occupation')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Nghề nghiệp không được quá 100 ký tự'),
 
   (req, res, next) => {
     const errors = validationResult(req);

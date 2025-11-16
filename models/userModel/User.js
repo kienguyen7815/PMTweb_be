@@ -9,6 +9,14 @@ class User {
         this.password = data.password;
         this.phone = data.phone;
         this.role = data.role || 'mb';
+        this.id_card = data.id_card;
+        this.address = data.address;
+        this.date_of_birth = data.date_of_birth;
+        this.gender = data.gender;
+        this.marital_status = data.marital_status;
+        this.ethnicity = data.ethnicity;
+        this.occupation = data.occupation;
+        this.avatar = data.avatar;
         this.created_at = data.created_at;
     }
 
@@ -24,7 +32,8 @@ class User {
             }
 
             // Mã hóa password
-            const hashedPassword = await bcrypt.hash(password, 10);
+            const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
+            const hashedPassword = await bcrypt.hash(password, bcryptRounds);
 
             const query = `
                 INSERT INTO users (username, email, password, phone, role) 
@@ -85,12 +94,31 @@ class User {
 
     // Lấy thông tin user (không bao gồm password)
     toJSON() {
+        // Xử lý date format
+        let formattedDate = this.date_of_birth;
+        if (this.date_of_birth) {
+            // Nếu date có format ISO (có T), lấy phần date
+            if (this.date_of_birth.toString().includes('T')) {
+                formattedDate = this.date_of_birth.toISOString().split('T')[0];
+            } else {
+                formattedDate = this.date_of_birth;
+            }
+        }
+
         return {
             id: this.id,
             username: this.username,
             email: this.email,
             phone: this.phone,
             role: this.role,
+            id_card: this.id_card,
+            address: this.address,
+            date_of_birth: formattedDate,
+            gender: this.gender,
+            marital_status: this.marital_status,
+            ethnicity: this.ethnicity,
+            occupation: this.occupation,
+            avatar: this.avatar,
             created_at: this.created_at
         };
     }
@@ -98,12 +126,55 @@ class User {
     // Cập nhật thông tin user
     async update(updateData) {
         try {
-            const allowedFields = ['username', 'email', 'phone', 'role'];
+            const allowedFields = [
+                'username', 
+                'email', 
+                'password',
+                'phone', 
+                'role',
+                'id_card',
+                'address',
+                'date_of_birth',
+                'gender',
+                'marital_status',
+                'ethnicity',
+                'occupation',
+                'avatar'
+            ];
             const fields = [];
             const values = [];
 
             for (const [key, value] of Object.entries(updateData)) {
-                if (allowedFields.includes(key) && value !== undefined) {
+                if (!allowedFields.includes(key)) {
+                    continue; // Bỏ qua các trường không được phép
+                }
+                
+                // Xử lý đặc biệt cho avatar
+                if (key === 'avatar') {
+                    // Avatar có thể là string (đường dẫn file) hoặc null/empty string (để xóa)
+                    // Chỉ cập nhật nếu value được cung cấp (không phải undefined)
+                    if (value !== undefined) {
+                        fields.push(`${key} = ?`);
+                        // Xử lý giá trị: null, empty string, hoặc undefined -> null; ngược lại -> string đã trim
+                        const avatarValue = (value === '' || value === null) ? null : String(value).trim();
+                        values.push(avatarValue);
+                        if (process.env.NODE_ENV === 'development') {
+                            console.log('Updating avatar in User model:', {
+                                key: key,
+                                originalValue: value,
+                                processedValue: avatarValue,
+                                type: typeof value,
+                                willBeAdded: true
+                            });
+                        }
+                    } else {
+                        if (process.env.NODE_ENV === 'development') {
+                            console.log('Avatar skipped - value is undefined');
+                        }
+                    }
+                } 
+                // Với các trường khác, bỏ qua giá trị undefined, null hoặc rỗng
+                else if (value !== undefined && value !== null && value !== '') {
                     fields.push(`${key} = ?`);
                     values.push(value);
                 }
@@ -116,13 +187,50 @@ class User {
             values.push(this.id);
             const query = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
             
-            await db.execute(query, values);
+            if (process.env.NODE_ENV === 'development') {
+                console.log('User update query:', query);
+                console.log('User update values:', values);
+                console.log('User update values count:', values.length);
+            }
             
-            // Cập nhật object hiện tại
-            Object.assign(this, updateData);
+            const [result] = await db.execute(query, values);
+            
+            if (process.env.NODE_ENV === 'development') {
+                console.log('User update result:', {
+                    affectedRows: result.affectedRows,
+                    changedRows: result.changedRows
+                });
+                console.log('User update successful');
+            }
+            
+            // Kiểm tra xem có dòng nào được cập nhật không
+            if (result.affectedRows === 0) {
+                throw new Error('Không có dòng nào được cập nhật trong database');
+            }
+            
+            // Cập nhật object hiện tại với giá trị đã được xử lý
+            for (const [key, value] of Object.entries(updateData)) {
+                if (allowedFields.includes(key)) {
+                    if (key === 'avatar') {
+                        this.avatar = value === '' ? null : value;
+                    } else {
+                        this[key] = value;
+                    }
+                }
+            }
+            
+            if (process.env.NODE_ENV === 'development') {
+                console.log('User object after update:', {
+                    id: this.id,
+                    avatar: this.avatar
+                });
+            }
             
             return this;
         } catch (error) {
+            if (process.env.NODE_ENV === 'development') {
+                console.error('User update error:', error);
+            }
             throw error;
         }
     }
