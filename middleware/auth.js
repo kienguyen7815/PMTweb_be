@@ -106,7 +106,9 @@ const requireAdmin = (req, res, next) => {
             message: 'Tính năng này chỉ dành cho Admin ở global scope'
         });
     }
-    if (req.user.role !== 'ad') {
+    // Chuẩn hóa role: chấp nhận cả 'ad' và 'admin'
+    const userRole = String(req.user.role).toLowerCase();
+    if (userRole !== 'ad' && userRole !== 'admin') {
         return res.status(403).json({
             success: false,
             message: 'Chỉ admin mới có quyền truy cập'
