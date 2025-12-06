@@ -36,15 +36,17 @@ class Notification {
 
             const query = `INSERT INTO ntf (user_id, message) VALUES ${placeholders}`;
             const [result] = await db.execute(query, flatValues);
-            
-            // Return created notifications
-            const created = [];
-            for (let i = 0; i < notifications.length; i++) {
-                const id = result.insertId + i;
-                const notif = await this.findById(id);
-                if (notif) created.push(notif);
-            }
-            return created;
+
+            // Lấy lại tất cả notification vừa tạo trong một query để tránh N+1
+            const firstId = result.insertId;
+            const lastId = firstId + notifications.length - 1;
+
+            const [rows] = await db.execute(
+                'SELECT * FROM ntf WHERE id BETWEEN ? AND ? ORDER BY id ASC',
+                [firstId, lastId]
+            );
+
+            return rows.map(row => new Notification(row));
         } catch (error) {
             throw error;
         }

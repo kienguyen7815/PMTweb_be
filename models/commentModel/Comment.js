@@ -27,7 +27,7 @@ class Comment {
         try {
             const query = `
                 SELECT tc.*, 
-                       u.id as user_id, u.username, u.email, u.role, u.avatar,
+                       u.id as user_id, u.username, u.email, u.avatar,
                        t.name as task_name
                 FROM tsk_cmt tc
                 JOIN users u ON tc.user_id = u.id
@@ -46,7 +46,7 @@ class Comment {
         try {
             const query = `
                 SELECT tc.*, 
-                       u.id as user_id, u.username, u.email, u.role, u.avatar
+                       u.id as user_id, u.username, u.email, u.avatar
                 FROM tsk_cmt tc
                 JOIN users u ON tc.user_id = u.id
                 WHERE tc.task_id = ?

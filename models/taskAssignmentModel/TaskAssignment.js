@@ -83,7 +83,7 @@ class TaskAssignment {
         try {
             const query = `
                 SELECT ta.*, 
-                       u.id as user_id, u.username, u.email, u.role, u.avatar
+                       u.id as user_id, u.username, u.email, u.avatar
                 FROM tsk_asg ta
                 JOIN users u ON ta.user_id = u.id
                 WHERE ta.task_id = ?

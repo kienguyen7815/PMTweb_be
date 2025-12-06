@@ -6,22 +6,25 @@ class Project {
         this.name = data.name;
         this.description = data.description || null;
         this.owner_id = data.owner_id || null;
+        this.workspace_id = data.workspace_id || null;
         this.status = data.status || 'Not Started';
         this.start_date = data.start_date || null;
         this.end_date = data.end_date || null;
         this.created_at = data.created_at;
     }
 
-    static async create({ name, description, owner_id, status = 'Not Started', start_date = null, end_date = null }) {
+    static async create({ name, description, owner_id, workspace_id = null, status = 'Not Started', start_date = null, end_date = null }) {
         // Validate status
         const validStatuses = ['Not Started', 'In Progress', 'Completed', 'Pending', 'Planned', 'Cancelled', 'Testing', 'In Review', 'Delayed'];
         const finalStatus = validStatuses.includes(status) ? status : 'Not Started';
         
-        const query = `INSERT INTO prj (name, description, owner_id, status, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?)`;
+        // Insert project (không có cột role trong bảng prj)
+        const query = `INSERT INTO prj (name, description, owner_id, workspace_id, status, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?)`;
         const params = [
             name?.trim() || '', 
             description?.trim() || null, 
-            owner_id || null, 
+            owner_id || null,
+            workspace_id || null,
             finalStatus,
             start_date || null,
             end_date || null
@@ -39,13 +42,22 @@ class Project {
         return new Project(rows[0]);
     }
 
-    static async findAll() {
-        const [rows] = await db.execute('SELECT * FROM prj ORDER BY created_at DESC');
+    static async findAll(workspaceId = null) {
+        let query = 'SELECT * FROM prj';
+        const params = [];
+        
+        if (workspaceId) {
+            query += ' WHERE workspace_id = ?';
+            params.push(workspaceId);
+        }
+        
+        query += ' ORDER BY created_at DESC';
+        const [rows] = await db.execute(query, params);
         return rows.map(r => new Project(r));
     }
 
     async update(updateData) {
-        const allowed = ['name', 'description', 'status', 'start_date', 'end_date'];
+        const allowed = ['name', 'description', 'status', 'workspace_id', 'start_date', 'end_date'];
         const fields = [];
         const values = [];
         
@@ -61,7 +73,7 @@ class Project {
                     values.push(v?.trim() || '');
                 } else if (k === 'description') {
                     values.push(v?.trim() || null);
-                } else if (k === 'start_date' || k === 'end_date') {
+                } else if (k === 'start_date' || k === 'end_date' || k === 'workspace_id') {
                     values.push(v || null);
                 } else {
                     values.push(v);

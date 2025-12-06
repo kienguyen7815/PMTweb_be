@@ -13,24 +13,54 @@ const getAll = async (req, res, next) => {
             });
         }
 
-        const currentRole = currentUser.role;
+        // Sử dụng workspace role nếu có, fallback về user role (global)
+        const currentRole = req.workspaceRole || currentUser.role;
+        const workspaceId = req.workspaceId;
         let users;
 
-        // Admin: hiển thị toàn bộ
-        if (currentRole === 'ad') {
+        // Admin: hiển thị toàn bộ (chỉ ở global scope)
+        if (currentRole === 'ad' && !workspaceId) {
             users = await User.findAll();
         }
         // PM: hiển thị role là tl, mb, clt (không hiển thị ad, pm)
         else if (currentRole === 'pm') {
-            const sql = 'SELECT * FROM users WHERE role IN (?, ?, ?) ORDER BY created_at DESC';
-            const [rows] = await db.execute(sql, ['tl', 'mb', 'clt']);
-            users = rows.map(row => new User(row));
+            if (workspaceId) {
+                // Trong workspace context, lấy users từ workspace_members với role tl, mb, clt
+                const sql = `
+                    SELECT DISTINCT u.*
+                    FROM users u
+                    INNER JOIN workspace_members wm ON u.id = wm.user_id
+                    WHERE wm.workspace_id = ? AND wm.role IN (?, ?, ?)
+                    ORDER BY u.created_at DESC
+                `;
+                const [rows] = await db.execute(sql, [workspaceId, 'tl', 'mb', 'clt']);
+                users = rows.map(row => new User(row));
+            } else {
+                // Global context, lấy từ users table
+                const sql = 'SELECT * FROM users WHERE role IN (?, ?, ?) ORDER BY created_at DESC';
+                const [rows] = await db.execute(sql, ['tl', 'mb', 'clt']);
+                users = rows.map(row => new User(row));
+            }
         }
         // Team Leader: hiển thị role là mb, clt (không hiển thị ad, pm, tl)
         else if (currentRole === 'tl') {
-            const sql = 'SELECT * FROM users WHERE role IN (?, ?) ORDER BY created_at DESC';
-            const [rows] = await db.execute(sql, ['mb', 'clt']);
-            users = rows.map(row => new User(row));
+            if (workspaceId) {
+                // Trong workspace context, lấy users từ workspace_members với role mb, clt
+                const sql = `
+                    SELECT DISTINCT u.*
+                    FROM users u
+                    INNER JOIN workspace_members wm ON u.id = wm.user_id
+                    WHERE wm.workspace_id = ? AND wm.role IN (?, ?)
+                    ORDER BY u.created_at DESC
+                `;
+                const [rows] = await db.execute(sql, [workspaceId, 'mb', 'clt']);
+                users = rows.map(row => new User(row));
+            } else {
+                // Global context, lấy từ users table
+                const sql = 'SELECT * FROM users WHERE role IN (?, ?) ORDER BY created_at DESC';
+                const [rows] = await db.execute(sql, ['mb', 'clt']);
+                users = rows.map(row => new User(row));
+            }
         }
         // Member: không có quyền (sẽ bị chặn ở middleware)
         else {
@@ -273,18 +303,44 @@ const getAvailableMembers = async (req, res, next) => {
     try {
         const query = req.query.q || '';
         const limit = parseInt(req.query.limit) || 50;
+        const workspaceId = req.workspaceId;
         
-        let sql = `
-            SELECT id, username, email, role, phone, avatar
-            FROM users 
-        `;
+        let sql;
         const params = [];
         
-        // If query provided, search by username or email
-        if (query.trim()) {
-            sql += ` WHERE username LIKE ? OR email LIKE ?`;
-            const searchPattern = `%${query.trim()}%`;
-            params.push(searchPattern, searchPattern);
+        // Nếu có workspace context, join với workspace_members để lấy role
+        if (workspaceId) {
+            sql = `
+                SELECT u.id, u.username, u.email, u.phone, u.avatar,
+                       COALESCE(wm.role, NULL) as role
+                FROM users u
+                LEFT JOIN workspace_members wm ON u.id = wm.user_id AND wm.workspace_id = ?
+            `;
+            params.push(workspaceId);
+            
+            // If query provided, search by username or email
+            if (query.trim()) {
+                sql += ` WHERE (u.username LIKE ? OR u.email LIKE ?)`;
+                const searchPattern = `%${query.trim()}%`;
+                params.push(searchPattern, searchPattern);
+            }
+            
+            sql += ` ORDER BY u.username ASC`;
+        } else {
+            // Không có workspace context, chỉ lấy thông tin cơ bản
+            sql = `
+                SELECT id, username, email, phone, avatar
+                FROM users 
+            `;
+            
+            // If query provided, search by username or email
+            if (query.trim()) {
+                sql += ` WHERE username LIKE ? OR email LIKE ?`;
+                const searchPattern = `%${query.trim()}%`;
+                params.push(searchPattern, searchPattern);
+            }
+            
+            sql += ` ORDER BY username ASC`;
         }
         
         // MySQL doesn't support placeholder for LIMIT, validate and use string interpolation
@@ -292,7 +348,7 @@ const getAvailableMembers = async (req, res, next) => {
         if (isNaN(limitNum) || limitNum < 1) {
             return res.status(400).json({ success: false, message: 'Limit must be a positive integer' });
         }
-        sql += ` ORDER BY username ASC LIMIT ${limitNum}`;
+        sql += ` LIMIT ${limitNum}`;
         
         const [rows] = await db.execute(sql, params);
         res.json({ success: true, data: rows });
@@ -306,6 +362,7 @@ const searchEmails = async (req, res, next) => {
     try {
         const query = req.query.q || '';
         const limit = parseInt(req.query.limit) || 10;
+        const workspaceId = req.workspaceId;
         
         if (!query.trim()) {
             return res.json({ success: true, data: [] });
@@ -315,10 +372,29 @@ const searchEmails = async (req, res, next) => {
         const limitValue = Number.isInteger(limit) && limit > 0 ? limit : 10;
         
         const searchPattern = `%${query.trim()}%`;
-        // LIMIT cannot use placeholder in some MySQL versions, so we include it directly in SQL
-        const sql = `SELECT id, username, email, role FROM users WHERE email LIKE ? AND role IN ('tl', 'mb') ORDER BY email`;
+        let sql;
+        let params;
         
-        const [rows] = await db.execute(sql, [searchPattern]);
+        if (workspaceId) {
+            // Trong workspace context, lấy role từ workspace_members
+            sql = `
+                SELECT u.id, u.username, u.email, wm.role
+                FROM users u
+                INNER JOIN workspace_members wm ON u.id = wm.user_id
+                WHERE wm.workspace_id = ? AND u.email LIKE ? AND wm.role IN ('tl', 'mb')
+                ORDER BY u.email
+            `;
+            params = [workspaceId, searchPattern];
+        } else {
+            // Global context, lấy role từ users table
+            sql = `SELECT id, username, email, role FROM users WHERE email LIKE ? AND role IN ('tl', 'mb') ORDER BY email`;
+            params = [searchPattern];
+        }
+        
+        // LIMIT cannot use placeholder in some MySQL versions, so we include it directly in SQL
+        sql += ` LIMIT ${limitValue}`;
+        
+        const [rows] = await db.execute(sql, params);
         res.json({ success: true, data: rows });
     } catch (error) {
         next(error);

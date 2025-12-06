@@ -45,8 +45,11 @@ const updateComment = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy comment' });
         }
 
-        // Only the comment owner can update
-        if (commentObj.user_id !== user_id && req.user.role !== 'ad') {
+        // Only the comment owner or admin can update
+        // Admin chỉ áp dụng ở global scope (không có workspace context)
+        const currentRole = req.workspaceRole || req.user.role;
+        const isAdmin = !req.workspaceRole && req.user.role === 'ad';
+        if (commentObj.user_id !== user_id && !isAdmin) {
             return res.status(403).json({ success: false, message: 'Không có quyền chỉnh sửa comment này' });
         }
 
@@ -71,7 +74,10 @@ const deleteComment = async (req, res, next) => {
         }
 
         // Only the comment owner or admin can delete
-        if (commentObj.user_id !== user_id && req.user.role !== 'ad') {
+        // Admin chỉ áp dụng ở global scope (không có workspace context)
+        const currentRole = req.workspaceRole || req.user.role;
+        const isAdmin = !req.workspaceRole && req.user.role === 'ad';
+        if (commentObj.user_id !== user_id && !isAdmin) {
             return res.status(403).json({ success: false, message: 'Không có quyền xóa comment này' });
         }
 

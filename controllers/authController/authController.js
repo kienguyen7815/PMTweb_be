@@ -8,12 +8,14 @@ class AuthController {
             const { username, email, password, role, phone } = req.body;
 
             // Tạo user mới
+            // Lưu ý: tránh cho phép client tự đặt role = 'admin' qua API register
+            const effectiveRole = role === 'admin' ? 'admin' : 'user';
             const user = await User.create({
                 username,
                 email,
                 password,
                 phone,
-                role: role || 'mb'
+                role: effectiveRole
             });
 
             // Tạo JWT token
@@ -405,15 +407,17 @@ class AuthController {
             }
             
             // Trả về lỗi chi tiết hơn
-            if (error.message) {
-                return res.status(500).json({
-                    success: false,
-                    message: error.message || 'Lỗi khi upload avatar',
-                    error: process.env.NODE_ENV === 'development' ? error.message : undefined
-                });
-            }
+            const statusCode = error.statusCode || 500;
+            const message = error.message || 'Lỗi khi upload avatar';
             
-            next(error);
+            return res.status(statusCode).json({
+                success: false,
+                message: message,
+                ...(process.env.NODE_ENV === 'development' && { 
+                    error: error.message,
+                    stack: error.stack 
+                })
+            });
         }
     }
 }

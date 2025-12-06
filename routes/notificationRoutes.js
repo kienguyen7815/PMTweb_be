@@ -4,21 +4,22 @@ const {
     authenticateToken, 
     requireViewPermission
 } = require('../middleware/auth');
+const { getWorkspaceRole } = require('../middleware/workspaceAuth');
 const notificationController = require('../controllers/notificationController/notificationController');
 
-// Get user's notifications - All authenticated users
-router.get('/', authenticateToken, requireViewPermission, notificationController.getMyNotifications);
+// Get user's notifications - All authenticated users (hỗ trợ workspace role)
+router.get('/', authenticateToken, getWorkspaceRole, requireViewPermission, notificationController.getMyNotifications);
 
-// Get unread count - All authenticated users
-router.get('/unread-count', authenticateToken, requireViewPermission, notificationController.getUnreadCount);
+// Get unread count - All authenticated users (hỗ trợ workspace role)
+router.get('/unread-count', authenticateToken, getWorkspaceRole, requireViewPermission, notificationController.getUnreadCount);
 
-// Mark notification as read - All authenticated users
-router.put('/:id/read', authenticateToken, requireViewPermission, notificationController.markAsRead);
+// Mark notification as read - All authenticated users (hỗ trợ workspace role)
+router.put('/:id/read', authenticateToken, getWorkspaceRole, requireViewPermission, notificationController.markAsRead);
 
-// Mark all as read - All authenticated users
-router.put('/read-all', authenticateToken, requireViewPermission, notificationController.markAllAsRead);
+// Mark all as read - All authenticated users (hỗ trợ workspace role)
+router.put('/read-all', authenticateToken, getWorkspaceRole, requireViewPermission, notificationController.markAllAsRead);
 
-// Delete notification - All authenticated users
-router.delete('/:id', authenticateToken, requireViewPermission, notificationController.deleteNotification);
+// Delete notification - All authenticated users (hỗ trợ workspace role)
+router.delete('/:id', authenticateToken, getWorkspaceRole, requireViewPermission, notificationController.deleteNotification);
 
 module.exports = router;

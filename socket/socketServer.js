@@ -4,13 +4,14 @@ const Comment = require('../models/commentModel/Comment');
 const ProjectComment = require('../models/projectCommentModel/ProjectComment');
 const User = require('../models/userModel/User');
 const Notification = require('../models/notificationModel/Notification');
+const WorkspaceMember = require('../models/workspaceModel/WorkspaceMember');
 
 let io;
 
 const initializeSocket = (server) => {
     io = new Server(server, {
         cors: {
-            origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+            origin: process.env.FRONTEND_URL,
             methods: ['GET', 'POST'],
             credentials: true
         }
@@ -24,7 +25,7 @@ const initializeSocket = (server) => {
         }
 
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
             
             // JWT only contains userId, need to get user from database
             const user = await User.findById(decoded.userId);
@@ -34,8 +35,44 @@ const initializeSocket = (server) => {
 
             // Set user info on socket
             socket.userId = user.id;
-            socket.userRole = user.role;
             socket.username = user.username;
+            
+            // Lấy workspace_id từ handshake nếu có
+            const workspaceId = socket.handshake.auth.workspace_id;
+            
+            // Debug logging
+            if (process.env.NODE_ENV === 'development') {
+                console.log(`Socket auth - User: ${user.username}, Workspace ID from handshake:`, workspaceId);
+            }
+            
+            // Nếu có workspace_id, lấy role từ workspace_members
+            if (workspaceId) {
+                const workspaceMember = await WorkspaceMember.findByWorkspaceAndUser(
+                    parseInt(workspaceId),
+                    user.id
+                );
+                if (workspaceMember) {
+                    socket.userRole = workspaceMember.role;
+                    socket.workspaceId = parseInt(workspaceId);
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log(`Socket auth - Found workspace member, role: ${workspaceMember.role}`);
+                    }
+                } else {
+                    // Không phải member của workspace, fallback về global role
+                    socket.userRole = user.role;
+                    socket.workspaceId = null;
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log(`Socket auth - Not a workspace member, using global role: ${user.role}`);
+                    }
+                }
+            } else {
+                // Không có workspace context, dùng global role
+                socket.userRole = user.role;
+                socket.workspaceId = null;
+                if (process.env.NODE_ENV === 'development') {
+                    console.log(`Socket auth - No workspace_id provided, using global role: ${user.role}`);
+                }
+            }
             
             next();
         } catch (err) {

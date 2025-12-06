@@ -39,6 +39,30 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
+    // Lỗi từ Multer (file upload)
+    if (err.name === 'MulterError') {
+        let message = 'Lỗi khi upload file';
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            message = 'Kích thước file vượt quá giới hạn cho phép (5MB)';
+        } else if (err.code === 'LIMIT_FILE_COUNT') {
+            message = 'Số lượng file vượt quá giới hạn';
+        } else if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+            message = 'File không được chấp nhận';
+        }
+        return res.status(400).json({
+            success: false,
+            message: message
+        });
+    }
+
+    // Lỗi từ file filter (multer)
+    if (err.message && err.message.includes('Chỉ chấp nhận file ảnh')) {
+        return res.status(400).json({
+            success: false,
+            message: err.message
+        });
+    }
+
     // Lỗi mặc định
     const statusCode = err.statusCode || 500;
     const message = err.message || 'Lỗi server nội bộ';
@@ -50,4 +74,4 @@ const errorHandler = (err, req, res, next) => {
     });
 };
 
-module.exports = { errorHandler };
+module.exports = errorHandler;

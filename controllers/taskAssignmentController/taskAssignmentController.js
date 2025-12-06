@@ -4,7 +4,32 @@ const TaskAssignment = require('../../models/taskAssignmentModel/TaskAssignment'
 const getMyTasks = async (req, res, next) => {
     try {
         const userId = req.user.id;
-        const tasks = await TaskAssignment.findByUserId(userId);
+        const workspaceId = req.workspaceId;
+        let tasks;
+
+        // Nếu có workspace context -> chỉ lấy các task thuộc projects trong workspace đó
+        if (workspaceId) {
+            const db = require('../../config/db');
+            const query = `
+                SELECT ta.*, 
+                       t.id as task_id, t.name as task_name, t.description as task_description,
+                       t.status as task_status, t.progress as task_progress,
+                       t.due_date as task_due_date, t.project_id, t.created_at as task_created_at,
+                       p.name as project_name,
+                       u.username as assigned_by_username
+                FROM tsk_asg ta
+                JOIN tasks t ON ta.task_id = t.id
+                JOIN prj p ON t.project_id = p.id
+                LEFT JOIN users u ON ta.user_id = u.id
+                WHERE ta.user_id = ? AND p.workspace_id = ?
+                ORDER BY ta.assigned_at DESC
+            `;
+            const [rows] = await db.execute(query, [userId, workspaceId]);
+            tasks = rows;
+        } else {
+            // Không có workspace context -> giữ behavior cũ (tất cả task được assign)
+            tasks = await TaskAssignment.findByUserId(userId);
+        }
         res.json({ success: true, data: tasks });
     } catch (err) {
         next(err);
@@ -56,6 +81,31 @@ const assignTask = async (req, res, next) => {
 const getTaskAssignments = async (req, res, next) => {
     try {
         const { taskId } = req.params;
+        
+        // Kiểm tra workspace nếu có
+        if (req.workspaceId) {
+            const db = require('../../config/db');
+            const Project = require('../../models/projectModel/Project');
+            const Task = require('../../models/taskModel/Task');
+            
+            // Lấy task để kiểm tra project workspace
+            const task = await Task.findById(taskId);
+            if (!task) {
+                return res.status(404).json({ success: false, message: 'Không tìm thấy task' });
+            }
+            
+            // Lấy project để kiểm tra workspace
+            const project = await Project.findById(task.project_id);
+            if (project && project.workspace_id) {
+                if (project.workspace_id !== req.workspaceId) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Bạn không có quyền xem assignments của task này'
+                    });
+                }
+            }
+        }
+        
         const assignments = await TaskAssignment.findByTaskId(taskId);
         res.json({ success: true, data: assignments });
     } catch (err) {

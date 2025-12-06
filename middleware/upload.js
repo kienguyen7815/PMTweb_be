@@ -20,9 +20,10 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     // Tạo tên file: userId_timestamp.extension
-    const userId = req.user?.id || 'unknown';
+    // req.user sẽ có sau khi authenticateToken middleware chạy
+    const userId = req.user?.id || req.user?.userId || 'unknown';
     const timestamp = Date.now();
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
     const filename = `${userId}_${timestamp}${ext}`;
     cb(null, filename);
   }
@@ -30,6 +31,11 @@ const storage = multer.diskStorage({
 
 // Filter chỉ chấp nhận file ảnh
 const fileFilter = (req, file, cb) => {
+  // Kiểm tra nếu không có file
+  if (!file) {
+    return cb(new Error('Không có file được upload'));
+  }
+
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);

@@ -6,7 +6,9 @@ const getAll = async (req, res, next) => {
         // Check and update expired projects before fetching
         await Project.checkAndUpdateExpiredProjects();
         
-        const projects = await Project.findAll();
+        // Nếu có workspace context, chỉ lấy projects trong workspace đó
+        const workspaceId = req.workspaceId || null;
+        const projects = await Project.findAll(workspaceId);
         res.json({ success: true, data: projects });
     } catch (error) {
         next(error);
@@ -20,23 +22,43 @@ const getMyProjects = async (req, res, next) => {
         await Project.checkAndUpdateExpiredProjects();
         
         const userId = req.user.id;
-        const userRole = req.user.role;
+        const currentRole = req.workspaceRole || req.user.role;
+        const workspaceId = req.workspaceId;
         
         let projects;
         
-        // PM and Admin can see all projects
-        if (userRole === 'ad' || userRole === 'pm') {
-            projects = await Project.findAll();
+        // Trong workspace context
+        if (workspaceId) {
+            // PM trong workspace có thể xem tất cả projects trong workspace
+            if (currentRole === 'pm') {
+                projects = await Project.findAll(workspaceId);
+            } else {
+                // TL, MB, CLT chỉ xem projects họ được assign
+                const [rows] = await db.execute(`
+                    SELECT DISTINCT p.*
+                    FROM prj p
+                    INNER JOIN prj_mb pm ON p.id = pm.project_id
+                    WHERE pm.user_id = ? AND p.workspace_id = ?
+                    ORDER BY p.created_at DESC
+                `, [userId, workspaceId]);
+                projects = rows.map(r => new Project(r));
+            }
         } else {
-            // TL, MB, CLT can only see projects they are assigned to
-            const [rows] = await db.execute(`
-                SELECT DISTINCT p.*
-                FROM prj p
-                INNER JOIN prj_mb pm ON p.id = pm.project_id
-                WHERE pm.user_id = ?
-                ORDER BY p.created_at DESC
-            `, [userId]);
-            projects = rows;
+            // Global context (không có workspace)
+            // PM và Admin có thể xem tất cả projects
+            if (currentRole === 'ad' || currentRole === 'pm') {
+                projects = await Project.findAll();
+            } else {
+                // TL, MB chỉ xem projects họ được assign
+                const [rows] = await db.execute(`
+                    SELECT DISTINCT p.*
+                    FROM prj p
+                    INNER JOIN prj_mb pm ON p.id = pm.project_id
+                    WHERE pm.user_id = ?
+                    ORDER BY p.created_at DESC
+                `, [userId]);
+                projects = rows.map(r => new Project(r));
+            }
         }
         
         res.json({ success: true, data: projects });
@@ -50,6 +72,17 @@ const getById = async (req, res, next) => {
         const project = await Project.findById(req.params.id);
         if (!project) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy dự án' });
+        }
+        
+        // Nếu project có workspace_id và user đang trong workspace context
+        // Kiểm tra xem project có thuộc workspace đó không
+        if (project.workspace_id && req.workspaceId) {
+            if (project.workspace_id !== req.workspaceId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Bạn không có quyền truy cập dự án này'
+                });
+            }
         }
         
         // Check and update status if end_date has passed
@@ -89,15 +122,27 @@ const create = async (req, res, next) => {
             console.log('Project create request:', {
                 body: req.body,
                 user: req.user?.id,
+                workspaceId: req.workspaceId,
                 contentType: req.get('Content-Type')
             });
         }
         
-        const { name, description, status, start_date, end_date, members = [] } = req.body;
+        const { name, description, status, start_date, end_date, members = [], workspace_id } = req.body;
         
         // Backend validation
         if (!name || !name.trim()) {
             return res.status(400).json({ success: false, message: 'Tên dự án là bắt buộc' });
+        }
+        
+        // Lấy workspace_id từ request hoặc từ workspace context
+        const finalWorkspaceId = workspace_id || req.workspaceId || null;
+        
+        // Nếu có workspace context, đảm bảo user là thành viên của workspace
+        if (finalWorkspaceId && !req.workspaceMember) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không phải là thành viên của workspace này'
+            });
         }
         
         // Validate members array
@@ -119,7 +164,8 @@ const create = async (req, res, next) => {
             status: status || 'Not Started', 
             start_date: start_date || null,
             end_date: end_date || null,
-            owner_id: req.user?.id 
+            owner_id: req.user?.id,
+            workspace_id: finalWorkspaceId
         });
         
         // Add members if provided
@@ -192,13 +238,25 @@ const update = async (req, res, next) => {
             console.log('Project update request:', {
                 id: req.params.id,
                 body: req.body,
-                user: req.user?.id
+                user: req.user?.id,
+                workspaceId: req.workspaceId
             });
         }
         
         const project = await Project.findById(req.params.id);
         if (!project) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy dự án' });
+        }
+        
+        // Nếu project có workspace_id và user đang trong workspace context
+        // Kiểm tra xem project có thuộc workspace đó không
+        if (project.workspace_id && req.workspaceId) {
+            if (project.workspace_id !== req.workspaceId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Bạn không có quyền chỉnh sửa dự án này'
+                });
+            }
         }
         
         // Backend validation
@@ -225,6 +283,7 @@ const update = async (req, res, next) => {
         if (req.body.name !== undefined) updateData.name = req.body.name.trim();
         if (req.body.description !== undefined) updateData.description = req.body.description?.trim() || null;
         if (req.body.status !== undefined) updateData.status = req.body.status;
+        if (req.body.workspace_id !== undefined) updateData.workspace_id = req.body.workspace_id;
         if (req.body.start_date !== undefined) updateData.start_date = req.body.start_date;
         if (req.body.end_date !== undefined) updateData.end_date = req.body.end_date;
         
@@ -340,6 +399,18 @@ const remove = async (req, res, next) => {
         if (!project) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy dự án' });
         }
+        
+        // Nếu project có workspace_id và user đang trong workspace context
+        // Kiểm tra xem project có thuộc workspace đó không
+        if (project.workspace_id && req.workspaceId) {
+            if (project.workspace_id !== req.workspaceId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Bạn không có quyền xóa dự án này'
+                });
+            }
+        }
+        
         await project.delete();
         res.json({ success: true, message: 'Đã xóa dự án' });
     } catch (error) {
@@ -434,18 +505,38 @@ const getUsers = async (req, res, next) => {
     try {
         const query = req.query.q || '';
         const limit = parseInt(req.query.limit) || 8;
+        const workspaceId = req.workspaceId || null;
         
-        let sql = `
-            SELECT id, username, email, role 
-            FROM users 
-        `;
+        let sql;
         const params = [];
-        
-        // If query provided, search by username or email
-        if (query.trim()) {
-            sql += ` WHERE username LIKE ? OR email LIKE ?`;
-            const searchPattern = `%${query.trim()}%`;
-            params.push(searchPattern, searchPattern);
+
+        // Nếu có workspace context -> join workspace_members để lấy role trong workspace
+        if (workspaceId) {
+            sql = `
+                SELECT u.id, u.username, u.email, wm.role as workspace_role
+                FROM users u
+                LEFT JOIN workspace_members wm 
+                    ON u.id = wm.user_id AND wm.workspace_id = ?
+            `;
+            params.push(workspaceId);
+
+            if (query.trim()) {
+                sql += ` WHERE (u.username LIKE ? OR u.email LIKE ?)`;
+                const searchPattern = `%${query.trim()}%`;
+                params.push(searchPattern, searchPattern);
+            }
+        } else {
+            // Global context: không có workspace, chỉ trả basic info, không có role
+            sql = `
+                SELECT id, username, email
+                FROM users
+            `;
+
+            if (query.trim()) {
+                sql += ` WHERE username LIKE ? OR email LIKE ?`;
+                const searchPattern = `%${query.trim()}%`;
+                params.push(searchPattern, searchPattern);
+            }
         }
         
         // MySQL doesn't support placeholder for LIMIT, validate and use string interpolation
