@@ -98,7 +98,10 @@ const getDashboardStats = async (req, res, next) => {
 // Get all users with detailed info
 const getAllUsers = async (req, res, next) => {
     try {
-        const { page = 1, limit = 20, search = '', role = '' } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const search = req.query.search || '';
+        const role = req.query.role || '';
         const offset = (page - 1) * limit;
 
         let whereClause = 'WHERE 1=1';
@@ -134,8 +137,8 @@ const getAllUsers = async (req, res, next) => {
             ${whereClause}
             GROUP BY u.id
             ORDER BY u.created_at DESC
-            LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+            LIMIT ${limit} OFFSET ${offset}
+        `, params);
 
         res.json({
             success: true,
@@ -150,8 +153,8 @@ const getAllUsers = async (req, res, next) => {
                 })),
                 pagination: {
                     total: countResult[0].total,
-                    page: parseInt(page),
-                    limit: parseInt(limit),
+                    page: page,
+                    limit: limit,
                     totalPages: Math.ceil(countResult[0].total / limit)
                 }
             }
@@ -355,7 +358,9 @@ const deleteUser = async (req, res, next) => {
 // Get all workspaces with statistics
 const getAllWorkspaces = async (req, res, next) => {
     try {
-        const { page = 1, limit = 20, search = '' } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const search = req.query.search || '';
         const offset = (page - 1) * limit;
 
         let whereClause = 'WHERE 1=1';
@@ -387,8 +392,8 @@ const getAllWorkspaces = async (req, res, next) => {
             ${whereClause}
             GROUP BY w.id
             ORDER BY w.created_at DESC
-            LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+            LIMIT ${limit} OFFSET ${offset}
+        `, params);
 
         res.json({
             success: true,
@@ -396,8 +401,8 @@ const getAllWorkspaces = async (req, res, next) => {
                 workspaces,
                 pagination: {
                     total: countResult[0].total,
-                    page: parseInt(page),
-                    limit: parseInt(limit),
+                    page: page,
+                    limit: limit,
                     totalPages: Math.ceil(countResult[0].total / limit)
                 }
             }
@@ -490,15 +495,13 @@ const deleteWorkspace = async (req, res, next) => {
 // Get activity logs
 const getActivityLogs = async (req, res, next) => {
     try {
-        const { 
-            page = 1, 
-            limit = 50, 
-            user_id = '', 
-            action = '', 
-            target_table = '',
-            start_date = '',
-            end_date = ''
-        } = req.query;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 50;
+        const user_id = req.query.user_id || '';
+        const action = req.query.action || '';
+        const target_table = req.query.target_table || '';
+        const start_date = req.query.start_date || '';
+        const end_date = req.query.end_date || '';
         const offset = (page - 1) * limit;
 
         let whereClause = 'WHERE 1=1';
@@ -545,8 +548,8 @@ const getActivityLogs = async (req, res, next) => {
             LEFT JOIN users u ON l.user_id = u.id
             ${whereClause}
             ORDER BY l.created_at DESC
-            LIMIT ? OFFSET ?
-        `, [...params, parseInt(limit), offset]);
+            LIMIT ${limit} OFFSET ${offset}
+        `, params);
 
         res.json({
             success: true,
@@ -554,8 +557,8 @@ const getActivityLogs = async (req, res, next) => {
                 logs,
                 pagination: {
                     total: countResult[0].total,
-                    page: parseInt(page),
-                    limit: parseInt(limit),
+                    page: page,
+                    limit: limit,
                     totalPages: Math.ceil(countResult[0].total / limit)
                 }
             }
