@@ -1,5 +1,6 @@
 const Member = require('../../models/memberModel/Member');
 const User = require('../../models/userModel/User');
+const WorkspaceMember = require('../../models/workspaceModel/WorkspaceMember');
 
 // Lấy danh sách members theo phân quyền
 const getAll = async (req, res, next) => {
@@ -12,7 +13,8 @@ const getAll = async (req, res, next) => {
             });
         }
 
-        const currentRole = currentUser.role;
+        // Sử dụng workspace role nếu có, fallback về user role
+        const currentRole = req.workspaceRole || currentUser.role;
 
         // Kiểm tra quyền truy cập
         // Admin, PM, Team Leader: có quyền xem
@@ -24,8 +26,9 @@ const getAll = async (req, res, next) => {
             });
         }
 
-        // Lấy tất cả members (table members không có role, nên không cần lọc)
-        const members = await Member.findAll(currentRole);
+        // Lấy tất cả members trong workspace hiện tại
+        const workspaceId = req.workspaceId || null;
+        const members = await Member.findAll(currentRole, workspaceId);
 
         res.json({
             success: true,
@@ -44,6 +47,14 @@ const getById = async (req, res, next) => {
             return res.status(404).json({
                 success: false,
                 message: 'Không tìm thấy thành viên'
+            });
+        }
+        
+        // Nếu có workspace context, đảm bảo member thuộc workspace đó
+        if (req.workspaceId && member.workspace_id && member.workspace_id !== req.workspaceId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Thành viên không thuộc workspace hiện tại'
             });
         }
         
@@ -67,6 +78,7 @@ const create = async (req, res, next) => {
         }
         
         const { name, email, date_of_birth, occupation } = req.body;
+        const workspaceId = req.workspaceId || null;
         
         // Backend validation - Xử lý toàn bộ nghiệp vụ
         if (!name || !name.trim()) {
@@ -111,22 +123,44 @@ const create = async (req, res, next) => {
             });
         }
         
-        // Kiểm tra email đã tồn tại trong table members chưa
+        // Kiểm tra email đã tồn tại trong table members cùng workspace chưa
         const existingMember = await Member.findByEmail(email.trim());
-        if (existingMember) {
+        if (existingMember && (!existingMember.workspace_id || existingMember.workspace_id === workspaceId)) {
             return res.status(400).json({ 
                 success: false, 
                 message: 'Email này đã được sử dụng trong danh sách thành viên' 
             });
         }
         
-        // Tạo member mới
+        // Tạo member mới, gắn với workspace hiện tại (nếu có)
         const member = await Member.create({
+            workspace_id: workspaceId,
             name: name.trim(),
             email: email.trim(),
             date_of_birth: date_of_birth && date_of_birth.trim() ? date_of_birth.trim() : null,
             occupation: occupation && occupation.trim() ? occupation.trim() : null
         });
+
+        // Nếu có workspace context và tồn tại user trong hệ thống với email này,
+        // tự động thêm user đó vào workspace_members để khi đăng nhập sẽ thấy workspace.
+        if (workspaceId) {
+            try {
+                const existingUser = await User.findByEmail(email.trim());
+                if (existingUser) {
+                    // Mặc định role là 'mb' trong workspace; PM có thể chỉnh sau nếu cần
+                    await WorkspaceMember.addMember({
+                        workspace_id: workspaceId,
+                        user_id: existingUser.id,
+                        role: 'mb'
+                    });
+                }
+            } catch (linkErr) {
+                if (process.env.NODE_ENV === 'development') {
+                    console.error('Error linking workspace member from member create:', linkErr);
+                }
+                // Không làm fail request nếu phần liên kết workspace member lỗi
+            }
+        }
         
         res.status(201).json({
             success: true,
@@ -162,6 +196,14 @@ const update = async (req, res, next) => {
         
         const member = await Member.findById(req.params.id);
         if (!member) {
+        // Nếu có workspace context, đảm bảo member thuộc workspace đó
+        if (req.workspaceId && member.workspace_id && member.workspace_id !== req.workspaceId) {
+            return res.status(403).json({
+                success: false,
+                message: 'Thành viên không thuộc workspace hiện tại'
+            });
+        }
+
             return res.status(404).json({
                 success: false,
                 message: 'Không tìm thấy thành viên'
@@ -283,53 +325,51 @@ const searchEmails = async (req, res, next) => {
             return res.json({ success: true, data: [] });
         }
         
-        const members = await Member.searchByEmail(query.trim(), limit);
-        
-        // Find corresponding user_id from users table based on email
+        const workspaceId = req.workspaceId || null;
+        const members = await Member.searchByEmail(query.trim(), limit, workspaceId);
+
+        // Tối ưu: join một lần để lấy luôn user tương ứng (tránh N+1 query)
         const db = require('../../config/db');
-        const results = [];
-        
-        for (const member of members) {
-            try {
-                // Try to find user with same email
-                const [users] = await db.execute(
-                    'SELECT id, username FROM users WHERE email = ? LIMIT 1',
-                    [member.email]
-                );
-                
-                if (users.length > 0) {
-                    // Member has corresponding user
-                    results.push({
-                        id: users[0].id, // Use user_id for project members
-                        member_id: member.id, // Keep member_id for reference
-                        name: member.name,
-                        username: users[0].username,
-                        email: member.email
-                    });
-                } else {
-                    // Member doesn't have corresponding user - still return but with member_id
-                    results.push({
-                        id: member.id, // Use member_id as fallback
-                        member_id: member.id,
-                        name: member.name,
-                        username: member.name, // Use name as username fallback
-                        email: member.email
-                    });
-                }
-            } catch (err) {
-                // If error finding user, still return member
-                results.push({
-                    id: member.id,
-                    member_id: member.id,
-                    name: member.name,
-                    username: member.name,
-                    email: member.email
-                });
-            }
+
+        if (!members.length) {
+            return res.json({ success: true, data: [] });
         }
-        
-        res.json({ 
-            success: true, 
+
+        const memberEmails = members.map(m => m.email);
+        const placeholders = memberEmails.map(() => '?').join(', ');
+
+        const [users] = await db.execute(
+            `SELECT id, username, email FROM users WHERE email IN (${placeholders})`,
+            memberEmails
+        );
+
+        const userByEmail = new Map(users.map(u => [u.email, u]));
+
+        const results = members.map(member => {
+            const user = userByEmail.get(member.email);
+
+            if (user) {
+                return {
+                    id: user.id,               // user_id dùng cho project members
+                    member_id: member.id,      // giữ lại member_id để tham chiếu
+                    name: member.name,
+                    username: user.username,
+                    email: member.email
+                };
+            }
+
+            // Không có user tương ứng vẫn trả về theo member
+            return {
+                id: member.id,
+                member_id: member.id,
+                name: member.name,
+                username: member.name,
+                email: member.email
+            };
+        });
+
+        res.json({
+            success: true,
             data: results
         });
     } catch (error) {

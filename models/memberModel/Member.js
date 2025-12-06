@@ -3,6 +3,7 @@ const db = require('../../config/db');
 class Member {
     constructor(data) {
         this.id = data.id;
+        this.workspace_id = data.workspace_id || null;
         this.name = data.name;
         this.email = data.email;
         this.date_of_birth = data.date_of_birth;
@@ -14,7 +15,7 @@ class Member {
     // Tạo member mới
     static async create(memberData) {
         try {
-            const { name, email, date_of_birth, occupation } = memberData;
+            const { name, email, date_of_birth, occupation, workspace_id = null } = memberData;
             
             // Kiểm tra email đã tồn tại chưa
             const existingMember = await this.findByEmail(email);
@@ -23,11 +24,12 @@ class Member {
             }
 
             const query = `
-                INSERT INTO members (name, email, date_of_birth, occupation) 
-                VALUES (?, ?, ?, ?)
+                INSERT INTO members (workspace_id, name, email, date_of_birth, occupation) 
+                VALUES (?, ?, ?, ?, ?)
             `;
             
             const [result] = await db.execute(query, [
+                workspace_id || null,
                 name.trim(),
                 email.trim(),
                 date_of_birth || null,
@@ -73,10 +75,18 @@ class Member {
     }
 
     // Lấy tất cả members (có thể lọc theo role của user hiện tại)
-    static async findAll(currentUserRole = null) {
+    static async findAll(currentUserRole = null, workspaceId = null) {
         try {
-            let query = 'SELECT * FROM members ORDER BY created_at DESC';
-            let params = [];
+            let query = 'SELECT * FROM members';
+            const params = [];
+
+            // Nếu có workspaceId -> chỉ lấy members của workspace đó
+            if (workspaceId) {
+                query += ' WHERE workspace_id = ?';
+                params.push(workspaceId);
+            }
+
+            query += ' ORDER BY created_at DESC';
 
             // Lọc theo role nếu có (logic nghiệp vụ)
             // Admin: hiển thị toàn bộ
@@ -145,6 +155,7 @@ class Member {
     toJSON() {
         return {
             id: this.id,
+            workspace_id: this.workspace_id,
             name: this.name,
             email: this.email,
             date_of_birth: this.date_of_birth ? 
@@ -158,15 +169,23 @@ class Member {
     }
 
     // Tìm kiếm members theo email pattern
-    static async searchByEmail(pattern, limit = 10) {
+    static async searchByEmail(pattern, limit = 10, workspaceId = null) {
         try {
             const searchPattern = `%${pattern.trim()}%`;
             // Ensure limit is a valid positive integer
             const limitValue = Number.isInteger(limit) && limit > 0 ? limit : 10;
             // LIMIT cannot use placeholder in some MySQL versions, so we include it directly in SQL
-            const query = `SELECT * FROM members WHERE email LIKE ? ORDER BY email`;
+            let query = `SELECT * FROM members WHERE email LIKE ?`;
+            const params = [searchPattern];
+
+            if (workspaceId) {
+                query += ' AND workspace_id = ?';
+                params.push(workspaceId);
+            }
+
+            query += ' ORDER BY email';
             
-            const [rows] = await db.execute(query, [searchPattern]);
+            const [rows] = await db.execute(query, params);
             
             return rows.map(row => new Member(row));
         } catch (error) {

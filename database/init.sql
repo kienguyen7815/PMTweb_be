@@ -2,14 +2,12 @@
 CREATE DATABASE IF NOT EXISTS taskhub_db;
 USE taskhub_db;
 
--- 1. Table Users - Quản lý người dùng và phân quyền
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(100) NOT NULL,
     password VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     phone VARCHAR(15),
-    role ENUM('ad', 'pm', 'tl', 'mb', 'clt') DEFAULT 'mb',
     id_card VARCHAR(20),
     address TEXT,
     date_of_birth DATE,
@@ -18,9 +16,34 @@ CREATE TABLE IF NOT EXISTS users (
     ethnicity VARCHAR(50),
     occupation VARCHAR(100),
     avatar VARCHAR(255) DEFAULT NULL,
+    role ENUM('user', 'admin') DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+
+
+-- 2. Table Workspaces - Không gian làm việc
+CREATE TABLE IF NOT EXISTS workspaces (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    owner_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 2.1. Table Workspace Members - Thành viên trong từng không gian làm việc
+-- Mỗi user có role riêng theo từng workspace
+CREATE TABLE IF NOT EXISTS workspace_members (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    workspace_id INT NOT NULL,
+    user_id INT NOT NULL,
+    role ENUM('pm', 'tl', 'mb', 'clt') DEFAULT 'mb',
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_workspace_user (workspace_id, user_id)
+);
 
 
 -- 3. Table prj - Quản lý thông tin dự án
@@ -29,11 +52,13 @@ CREATE TABLE IF NOT EXISTS prj (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     owner_id INT,
+    workspace_id INT,
     status ENUM('Not Started', 'In Progress', 'Completed', 'Pending', 'Planned', 'Cancelled', 'Testing', 'In Review', 'Delayed') DEFAULT 'Not Started',
     start_date DATE,
     end_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
 );
 
 -- 4. Table Project Members - Quản lý thành viên từng dự án
@@ -130,17 +155,21 @@ CREATE TABLE IF NOT EXISTS ntf (
 -- 11. Table Members - Quản lý thông tin thành viên
 CREATE TABLE IF NOT EXISTS members (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    workspace_id INT NULL,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     date_of_birth DATE,
     occupation VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_prj_owner_id ON prj(owner_id);
+CREATE INDEX idx_prj_workspace_id ON prj(workspace_id);
+CREATE INDEX idx_workspace_members_user_id ON workspace_members(user_id);
+CREATE INDEX idx_workspace_members_workspace_id ON workspace_members(workspace_id);
 CREATE INDEX idx_prj_mb_project_id ON prj_mb(project_id);
 CREATE INDEX idx_prj_mb_user_id ON prj_mb(user_id);
 CREATE INDEX idx_tasks_project_id ON tasks(project_id);
@@ -156,4 +185,15 @@ CREATE INDEX idx_ntf_user_id ON ntf(user_id);
 CREATE INDEX idx_ntf_is_read ON ntf(is_read);
 CREATE INDEX idx_members_email ON members(email);
 
+-- Migration: Thêm cột workspace_id vào bảng members (nếu chưa có)
+ALTER TABLE members ADD COLUMN workspace_id INT NULL;
+ALTER TABLE members ADD CONSTRAINT fk_members_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
+CREATE INDEX idx_members_workspace_id ON members(workspace_id);
 
+-- Migration: Thêm cột workspace_id vào bảng prj (nếu chưa có)
+ALTER TABLE prj ADD COLUMN workspace_id INT NULL;
+ALTER TABLE prj ADD CONSTRAINT fk_prj_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL;
+CREATE INDEX idx_prj_workspace_id ON prj(workspace_id);
+
+-- Migration: Thêm cột role vào bảng users (nếu chưa có)
+ALTER TABLE users ADD COLUMN role ENUM('user', 'admin') DEFAULT 'user';

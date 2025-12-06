@@ -86,8 +86,26 @@ const authenticateToken = async (req, res, next) => {
     }
 };
 
-// Middleware kiểm tra quyền admin
+// Helper function để lấy role hiện tại (ưu tiên workspace role, fallback về user role)
+const getCurrentRole = (req) => {
+    // Nếu có workspace role, ưu tiên dùng workspace role
+    // Admin role chỉ áp dụng ở global scope (không có workspace)
+    if (req.workspaceRole) {
+        return req.workspaceRole;
+    }
+    // Nếu không có workspace, dùng user role
+    return req.user?.role || null;
+};
+
+// Middleware kiểm tra quyền admin (chỉ global, không áp dụng trong workspace)
 const requireAdmin = (req, res, next) => {
+    // Admin chỉ áp dụng ở global scope
+    if (req.workspaceRole) {
+        return res.status(403).json({
+            success: false,
+            message: 'Tính năng này chỉ dành cho Admin ở global scope'
+        });
+    }
     if (req.user.role !== 'ad') {
         return res.status(403).json({
             success: false,
@@ -99,66 +117,161 @@ const requireAdmin = (req, res, next) => {
 
 // Middleware kiểm tra quyền PM hoặc Admin
 const requirePMOrAdmin = (req, res, next) => {
-    if (!['ad', 'pm'].includes(req.user.role)) {
-        return res.status(403).json({
-            success: false,
-            message: 'Chỉ Project Manager hoặc Admin mới có quyền truy cập'
-        });
+    const currentRole = getCurrentRole(req);
+    // Trong workspace: chỉ PM
+    // Global: Admin hoặc PM
+    if (req.workspaceRole) {
+        if (currentRole !== 'pm') {
+            return res.status(403).json({
+                success: false,
+                message: 'Chỉ Project Manager trong workspace mới có quyền truy cập'
+            });
+        }
+    } else {
+        if (!['ad', 'pm'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Chỉ Project Manager hoặc Admin mới có quyền truy cập'
+            });
+        }
     }
     next();
 };
 
 // Middleware kiểm tra quyền Team Leader, PM hoặc Admin
 const requireLeaderOrAbove = (req, res, next) => {
-    if (!['ad', 'pm', 'tl'].includes(req.user.role)) {
-        return res.status(403).json({
-            success: false,
-            message: 'Bạn không có quyền truy cập tính năng này'
-        });
+    const currentRole = getCurrentRole(req);
+    // Trong workspace: PM hoặc TL
+    // Global: Admin, PM, hoặc TL
+    if (req.workspaceRole) {
+        if (!['pm', 'tl'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền truy cập tính năng này'
+            });
+        }
+    } else {
+        if (!['ad', 'pm', 'tl'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền truy cập tính năng này'
+            });
+        }
     }
     next();
 };
 
 // Middleware kiểm tra quyền xem (tất cả role)
 const requireViewPermission = (req, res, next) => {
-    if (!['ad', 'pm', 'tl', 'mb'].includes(req.user.role)) {
-        return res.status(403).json({
-            success: false,
-            message: 'Bạn không có quyền xem tính năng này'
-        });
+    const currentRole = getCurrentRole(req);
+    // Trong workspace: PM, TL, MB, CLT
+    // Global: Admin, PM, TL, MB
+    if (req.workspaceRole) {
+        if (!['pm', 'tl', 'mb', 'clt'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền xem tính năng này'
+            });
+        }
+    } else {
+        if (!['ad', 'pm', 'tl', 'mb'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền xem tính năng này'
+            });
+        }
     }
     next();
 };
 
 // Middleware kiểm tra quyền chỉnh sửa (TL, PM, Admin)
 const requireEditPermission = (req, res, next) => {
-    if (!['ad', 'pm', 'tl'].includes(req.user.role)) {
-        return res.status(403).json({
-            success: false,
-            message: 'Bạn không có quyền chỉnh sửa tính năng này'
-        });
+    const currentRole = getCurrentRole(req);
+    // Trong workspace: PM hoặc TL
+    // Global: Admin, PM, hoặc TL
+    if (req.workspaceRole) {
+        if (!['pm', 'tl'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền chỉnh sửa tính năng này'
+            });
+        }
+    } else {
+        if (!['ad', 'pm', 'tl'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền chỉnh sửa tính năng này'
+            });
+        }
     }
     next();
 };
 
 // Middleware kiểm tra quyền quản lý thành viên (TL, PM, Admin)
 const requireMemberManagement = (req, res, next) => {
-    if (!['ad', 'pm', 'tl'].includes(req.user.role)) {
-        return res.status(403).json({
-            success: false,
-            message: 'Bạn không có quyền quản lý thành viên'
-        });
+    const currentRole = getCurrentRole(req);
+    // Trong workspace: PM hoặc TL (TL có thể xem available members để assign task)
+    // Global: Admin, PM, hoặc TL
+    if (req.workspaceRole) {
+        if (!['pm', 'tl'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Chỉ Project Manager hoặc Team Leader trong workspace mới có quyền quản lý thành viên'
+            });
+        }
+    } else {
+        if (!['ad', 'pm', 'tl'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền quản lý thành viên'
+            });
+        }
     }
     next();
 };
 
 // Middleware kiểm tra quyền xem thành viên (tất cả role)
 const requireViewMembers = (req, res, next) => {
-    if (!['ad', 'pm', 'tl', 'mb'].includes(req.user.role)) {
-        return res.status(403).json({
-            success: false,
-            message: 'Bạn không có quyền xem danh sách thành viên'
-        });
+    const currentRole = getCurrentRole(req);
+    // Trong workspace: PM, TL, MB, CLT
+    // Global: Admin, PM, TL, MB
+    if (req.workspaceRole) {
+        if (!['pm', 'tl', 'mb', 'clt'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền xem danh sách thành viên'
+            });
+        }
+    } else {
+        if (!['ad', 'pm', 'tl', 'mb'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền xem danh sách thành viên'
+            });
+        }
+    }
+    next();
+};
+
+// Middleware kiểm tra quyền search members (cho phép tất cả thành viên trong workspace search)
+const requireSearchMembers = (req, res, next) => {
+    const currentRole = getCurrentRole(req);
+    // Trong workspace: PM, TL, MB, CLT đều có thể search
+    // Global: Admin, PM, TL, MB
+    if (req.workspaceRole) {
+        if (!['pm', 'tl', 'mb', 'clt'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền tìm kiếm thành viên'
+            });
+        }
+    } else {
+        if (!['ad', 'pm', 'tl', 'mb'].includes(currentRole)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Bạn không có quyền tìm kiếm thành viên'
+            });
+        }
     }
     next();
 };
@@ -186,5 +299,7 @@ module.exports = {
     requireEditPermission,
     requireMemberManagement,
     requireViewMembers,
-    generateToken
+    requireSearchMembers,
+    generateToken,
+    getCurrentRole
 };

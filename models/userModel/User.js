@@ -8,7 +8,14 @@ class User {
         this.email = data.email;
         this.password = data.password;
         this.phone = data.phone;
-        this.role = data.role || 'mb';
+        // Global role: chuẩn hóa về 'user' hoặc 'admin' (không phải role trong workspace)
+        // Hỗ trợ cả giá trị cũ 'ad' -> map thành 'admin'
+        if (!data.role) {
+            this.role = 'user';
+        } else {
+            const rawRole = String(data.role).toLowerCase();
+            this.role = (rawRole === 'admin' || rawRole === 'ad') ? 'admin' : 'user';
+        }
         this.id_card = data.id_card;
         this.address = data.address;
         this.date_of_birth = data.date_of_birth;
@@ -23,7 +30,7 @@ class User {
     // Tạo user mới
     static async create(userData) {
         try {
-            const { username, email, password, phone, role = 'mb' } = userData;
+            const { username, email, password, phone, role = 'user' } = userData;
             
             // Kiểm tra email đã tồn tại chưa
             const existingUser = await this.findByEmail(email);

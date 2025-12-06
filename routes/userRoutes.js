@@ -8,10 +8,11 @@ const {
     requireMemberManagement,
     requireLeaderOrAbove
 } = require('../middleware/auth');
+const { getWorkspaceRole } = require('../middleware/workspaceAuth');
 const userController = require('../controllers/userController/userController');
 
-// Lấy danh sách users - Admin, PM, Team Leader (TL chỉ xem, không thể thêm/sửa/xóa)
-router.get('/', authenticateToken, requireLeaderOrAbove, userController.getAll);
+// Lấy danh sách users - Admin, PM, Team Leader (TL chỉ xem, không thể thêm/sửa/xóa) (hỗ trợ workspace role)
+router.get('/', authenticateToken, getWorkspaceRole, requireLeaderOrAbove, userController.getAll);
 
 // Lấy thông tin user theo ID - Tất cả role có thể xem
 router.get('/:id', authenticateToken, requireViewMembers, userController.getById);
@@ -25,10 +26,10 @@ router.put('/:id', authenticateToken, requirePMOrAdmin, userController.update);
 // Xóa user - Chỉ Admin
 router.delete('/:id', authenticateToken, requireAdmin, userController.remove);
 
-// Lấy danh sách users cho việc thêm vào project (với tìm kiếm) - Chỉ TL, PM, Admin
-router.get('/available/members', authenticateToken, requireMemberManagement, userController.getAvailableMembers);
+// Lấy danh sách users cho việc thêm vào project (với tìm kiếm) - Chỉ TL, PM, Admin (hỗ trợ workspace role)
+router.get('/available/members', authenticateToken, getWorkspaceRole, requireMemberManagement, userController.getAvailableMembers);
 
-// Tìm kiếm email theo pattern (chỉ role tl, mb) - TL, PM, Admin
-router.get('/search/emails', authenticateToken, requireMemberManagement, userController.searchEmails);
+// Tìm kiếm email theo pattern (chỉ role tl, mb) - TL, PM, Admin (cho phép TL trong workspace)
+router.get('/search/emails', authenticateToken, getWorkspaceRole, requireLeaderOrAbove, userController.searchEmails);
 
 module.exports = router;

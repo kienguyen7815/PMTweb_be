@@ -22,7 +22,10 @@ const logRoutes = require('./routes/logRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const aiRoutes = require('./routes/aiRoutes');
-const { errorHandler } = require('./middleware/errorHandler');
+const workspaceRoutes = require('./routes/workspaceRoutes');
+const errorHandler = require('./middleware/errorHandler');
+
+
 
 dotenv.config();
 
@@ -90,6 +93,7 @@ app.use('/api/logs', logRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/workspaces', workspaceRoutes);
 
 // 404 handler
 app.use((req, res) => {

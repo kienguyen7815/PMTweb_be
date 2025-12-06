@@ -6,24 +6,31 @@ const {
     requireViewPermission, 
     requireEditPermission 
 } = require('../middleware/auth');
+const { getWorkspaceRole } = require('../middleware/workspaceAuth');
 const taskController = require('../controllers/taskController/taskController');
 
 // List by project - Tất cả role có thể xem
-router.get('/project/:projectId', authenticateToken, requireViewPermission, taskController.listByProject);
+router.get('/project/:projectId', authenticateToken, getWorkspaceRole, requireViewPermission, taskController.listByProject);
+
+// Get status options
+router.get('/statuses', authenticateToken, getWorkspaceRole, requireViewPermission, taskController.getStatuses);
 
 // Get by id - Tất cả role có thể xem
-router.get('/:id', authenticateToken, requireViewPermission, taskController.getById);
+router.get('/:id', authenticateToken, getWorkspaceRole, requireViewPermission, taskController.getById);
 
 // Create - Chỉ TL, PM, Admin
-router.post('/', authenticateToken, requireEditPermission, taskController.create);
+router.post('/', authenticateToken, getWorkspaceRole, requireEditPermission, taskController.create);
 
 // Update - Chỉ TL, PM, Admin
-router.put('/:id', authenticateToken, requireEditPermission, taskController.update);
+router.put('/:id', authenticateToken, getWorkspaceRole, requireEditPermission, taskController.update);
 
 // Update progress - Tất cả role có thể cập nhật (MB, TL, PM, Admin)
-router.put('/:id/progress', authenticateToken, requireViewPermission, taskController.updateProgress);
+router.put('/:id/progress', authenticateToken, getWorkspaceRole, requireViewPermission, taskController.updateProgress);
+
+// Update status - Tất cả role có thể cập nhật nếu được giao hoặc là PM/Admin
+router.put('/:id/status', authenticateToken, getWorkspaceRole, requireViewPermission, taskController.updateStatus);
 
 // Delete - Chỉ TL, PM, Admin
-router.delete('/:id', authenticateToken, requireEditPermission, taskController.remove);
+router.delete('/:id', authenticateToken, getWorkspaceRole, requireEditPermission, taskController.remove);
 
 module.exports = router;

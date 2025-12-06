@@ -27,7 +27,7 @@ class ProjectComment {
         try {
             const query = `
                 SELECT pc.*, 
-                       u.id as user_id, u.username, u.email, u.role, u.avatar,
+                       u.id as user_id, u.username, u.email, u.avatar,
                        p.name as project_name
                 FROM prj_cmt pc
                 JOIN users u ON pc.user_id = u.id
@@ -46,7 +46,7 @@ class ProjectComment {
         try {
             const query = `
                 SELECT pc.*, 
-                       u.id as user_id, u.username, u.email, u.role, u.avatar
+                       u.id as user_id, u.username, u.email, u.avatar
                 FROM prj_cmt pc
                 JOIN users u ON pc.user_id = u.id
                 WHERE pc.project_id = ?
