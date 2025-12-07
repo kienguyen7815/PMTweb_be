@@ -46,13 +46,23 @@ app.use(cors(corsOptions));
 // Compression middleware
 app.use(compression());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // Default: 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10), // Default: 100 requests per window
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
+// Rate limiting - Tắt trong development, bật trong production
+if (NODE_ENV === 'production') {
+  const limiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10),
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+      return req.path.includes('/socket.io');
+    }
+  });
+  app.use('/api/', limiter);
+  console.log('Rate limiting enabled for production');
+} else {
+  console.log('Rate limiting disabled for development');
+}
 
 // Body parsing middleware
 const bodySizeLimit = process.env.BODY_SIZE_LIMIT || '10mb';

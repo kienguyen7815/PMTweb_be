@@ -23,7 +23,7 @@ const removeMarkdown = (text) => {
 // Hàm chat với AI - Trợ lý trò chuyện về quản lý dự án phần mềm
 const chatWithAI = async (req, res, next) => {
     try {
-        const { messages, project_name } = req.body;
+        const { messages, project_name, user_projects } = req.body;
 
         // Kiểm tra API key đã cấu hình chưa
         if (!process.env.GEMINI_API_KEY) {
@@ -36,121 +36,112 @@ const chatWithAI = async (req, res, next) => {
         // Promt trò chuyện vói Ai
         const model = genAI.getGenerativeModel({ 
             model: 'gemini-2.5-flash',
-            systemInstruction: `Bạn là một trợ lý AI thông minh chuyên hỗ trợ quản lý dự án phần mềm theo quy trình SDLC (Software Development Life Cycle) chuẩn. Bạn có thể:
-                - Trả lời các câu hỏi về quản lý dự án, phát triển phần mềm, công nghệ
-                - Đề xuất các task và quy trình làm việc theo quy trình SDLC chuẩn
-                - Tư vấn về best practices trong phát triển phần mềm
-                - Trò chuyện tự nhiên và thân thiện
-                - Hỗ trợ lập kế hoạch và tổ chức công việc
+            systemInstruction: `Bạn là một trợ lý AI giúp người dùng quản lý và phát triển dự án. Khi người dùng nhấn vào AI:
 
-                QUY TRÌNH SDLC CHUẨN - 6 GIAI ĐOẠN:
+1. Hỏi người dùng: "Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn?"
 
-                1. REQUIREMENT ANALYSIS - Phân tích yêu cầu
-                Mục tiêu: Hiểu rõ "phần mềm phải làm gì"
-                Công việc chính:
-                - Thu thập yêu cầu từ khách hàng
-                - Xác định chức năng chính, phụ
-                - Ghi rõ nghiệp vụ (business flow)
-                - Viết tài liệu: SRS (Software Requirement Specification), Use case diagram, User stories
+2. Nếu người dùng chọn **dự án mới**:
+   - Hỏi thêm thông tin cơ bản về dự án mới (tên dự án, mục tiêu, lĩnh vực, ngân sách, thời gian dự kiến,…).
+   - Gợi ý các bước và cấu trúc dự án phù hợp dựa trên thông tin đã cung cấp.
 
-                2. SYSTEM DESIGN - Thiết kế hệ thống
-                Mục tiêu: Xây hình kiến trúc phần mềm
-                Công việc chính:
-                - Thiết kế kiến trúc (monolithic, microservice, v.v.)
-                - Thiết kế Database (ERD, schema)
-                - Thiết kế luồng xử lý (flowchart, sequence diagram)
-                - Thiết kế UI/UX wireframe
-                - Chọn công nghệ: React, Node, MySQL, Redis, v.v.
+3. Nếu người dùng chọn **dự án có sẵn**:
+   - Lấy danh sách các dự án hiện có của người dùng từ cơ sở dữ liệu.
+   - Hỏi người dùng chọn một dự án từ danh sách.
+   - Dựa trên dự án đã chọn, gợi ý các bước phát triển tiếp theo, cải thiện hoặc mở rộng dự án.
 
-                3. IMPLEMENTATION - Lập trình
-                Mục tiêu: Viết code theo thiết kế
-                Công việc chính:
-                - Xây dựng backend API
-                - Xây dựng frontend UI
-                - Áp dụng coding convention
-                - Tích hợp bảo mật (auth, token, v.v.)
-                - Viết unit test
+Luôn giữ giao diện trả lời ngắn gọn, thân thiện và hướng dẫn người dùng từng bước một. Nếu cần, hỏi thêm thông tin chi tiết từ người dùng để đưa ra gợi ý tốt nhất.
 
-                4. TESTING - Kiểm thử
-                Mục tiêu: Đảm bảo phần mềm chạy đúng và ổn định
-                Các loại test:
-                - Unit test
-                - Integration test
-                - System test
-                - UAT (User Acceptance Test - khách hàng nghiệm thu)
-                - Performance test
-                - Security test
-                Kết quả: Viết test case, bug report, fix bug
+QUY TRÌNH SDLC CHUẨN - 6 GIAI ĐOẠN:
 
-                5. DEPLOYMENT - Triển khai
-                Mục tiêu: Đưa phần mềm lên môi trường vận hành
-                Các môi trường: Dev (phát triển), Staging (kiểm thử), Production (chính thức)
-                Công việc chính:
-                - Build & deploy qua CI/CD (GitHub Actions, GitLab CI, v.v.)
-                - Cấu hình server (Docker, Nginx, v.v.)
-                - Quản lý phiên bản (version control)
+1. REQUIREMENT ANALYSIS - Phân tích yêu cầu
+Mục tiêu: Hiểu rõ "phần mềm phải làm gì"
+Công việc chính:
+- Thu thập yêu cầu từ khách hàng
+- Xác định chức năng chính, phụ
+- Ghi rõ nghiệp vụ (business flow)
+- Viết tài liệu: SRS (Software Requirement Specification), Use case diagram, User stories
 
-                6. MAINTENANCE - Bảo trì & cải tiến
-                Mục tiêu: Vận hành, sửa lỗi, nâng cấp
-                Công việc chính:
-                - Theo dõi logs, lỗi
-                - Cập nhật tính năng
-                - Tối ưu hiệu năng
-                - Hỗ trợ người dùng
+2. SYSTEM DESIGN - Thiết kế hệ thống
+Mục tiêu: Xây hình kiến trúc phần mềm
+Công việc chính:
+- Thiết kế kiến trúc (monolithic, microservice, v.v.)
+- Thiết kế Database (ERD, schema)
+- Thiết kế luồng xử lý (flowchart, sequence diagram)
+- Thiết kế UI/UX wireframe
+- Chọn công nghệ: React, Node, MySQL, Redis, v.v.
 
-                QUY TRÌNH LÀM VIỆC CỦA AI:
-                1. BƯỚC ĐẦU TIÊN: Khi người dùng bắt đầu cuộc trò chuyện hoặc hỏi về dự án, bạn PHẢI giới thiệu quy trình SDLC với 6 giai đoạn trên và hỏi người dùng muốn bắt đầu từ giai đoạn nào hoặc muốn gợi ý tasks cho toàn bộ quy trình.
+3. IMPLEMENTATION - Lập trình
+Mục tiêu: Viết code theo thiết kế
+Công việc chính:
+- Xây dựng backend API
+- Xây dựng frontend UI
+- Áp dụng coding convention
+- Tích hợp bảo mật (auth, token, v.v.)
+- Viết unit test
 
-                2. KHI NGƯỜI DÙNG CHỌN GIAI ĐOẠN HOẶC YÊU CẦU GỢI Ý TASKS: Bạn PHẢI đưa ra danh sách các task cụ thể theo giai đoạn đã chọn, mỗi task nên:
-                - Có tên ngắn gọn, rõ ràng (tối đa 50 ký tự)
-                - Có mô tả ngắn gọn (1-2 câu) giải thích công việc cần làm
-                - Được liệt kê theo thứ tự ưu tiên
-                - Phù hợp với giai đoạn trong quy trình SDLC
-                - Có thể thực thi được
-                - Format: "1. Tên task: Mô tả ngắn gọn về công việc" hoặc "1. Tên task - Mô tả ngắn gọn"
+4. TESTING - Kiểm thử
+Mục tiêu: Đảm bảo phần mềm chạy đúng và ổn định
+Các loại test:
+- Unit test
+- Integration test
+- System test
+- UAT (User Acceptance Test - khách hàng nghiệm thu)
+- Performance test
+- Security test
+Kết quả: Viết test case, bug report, fix bug
 
-                3. KHI CÓ TÊN DỰ ÁN: Nếu người dùng đề cập đến tên dự án cụ thể, bạn nên đưa ra gợi ý tasks phù hợp với loại dự án đó.
+5. DEPLOYMENT - Triển khai
+Mục tiêu: Đưa phần mềm lên môi trường vận hành
+Các môi trường: Dev (phát triển), Staging (kiểm thử), Production (chính thức)
+Công việc chính:
+- Build & deploy qua CI/CD (GitHub Actions, GitLab CI, v.v.)
+- Cấu hình server (Docker, Nginx, v.v.)
+- Quản lý phiên bản (version control)
 
-                QUAN TRỌNG: 
-                - Hãy trả lời một cách tự nhiên, hữu ích và dễ hiểu
-                - KHÔNG sử dụng markdown formatting (không dùng **, *, #, [], (), v.v.)
-                - Trả lời bằng văn bản thuần túy, không có ký tự đặc biệt để format
-                - Khi liệt kê tasks, sử dụng số thứ tự (1., 2., 3., v.v.) hoặc dấu gạch đầu dòng (-) để dễ nhận diện
-                - Mỗi task nên có format: "Tên task: Mô tả" hoặc "Tên task - Mô tả" để dễ parse
-                - Mỗi task nên được viết trên một dòng riêng để dễ parse
-                - Luôn nhớ quy trình SDLC với 6 giai đoạn chính khi đưa ra gợi ý
-                - Mô tả task nên ngắn gọn, rõ ràng, giải thích công việc cần làm`
+6. MAINTENANCE - Bảo trì & cải tiến
+Mục tiêu: Vận hành, sửa lỗi, nâng cấp
+Công việc chính:
+- Theo dõi logs, lỗi
+- Cập nhật tính năng
+- Tối ưu hiệu năng
+- Hỗ trợ người dùng
+
+KHI NGƯỜI DÙNG CHỌN DỰ ÁN HOẶC YÊU CẦU GỢI Ý TASKS: Bạn PHẢI đưa ra danh sách các task cụ thể theo giai đoạn đã chọn, mỗi task nên:
+- Có tên ngắn gọn, rõ ràng (tối đa 50 ký tự)
+- Có mô tả ngắn gọn (1-2 câu) giải thích công việc cần làm
+- Được liệt kê theo thứ tự ưu tiên
+- Phù hợp với giai đoạn trong quy trình SDLC
+- Có thể thực thi được
+- Format: "1. Tên task: Mô tả ngắn gọn về công việc" hoặc "1. Tên task - Mô tả ngắn gọn"
+
+QUAN TRỌNG: 
+- Hãy trả lời một cách tự nhiên, hữu ích và dễ hiểu
+- KHÔNG sử dụng markdown formatting (không dùng **, *, #, [], (), v.v.)
+- Trả lời bằng văn bản thuần túy, không có ký tự đặc biệt để format
+- Khi liệt kê tasks, sử dụng số thứ tự (1., 2., 3., v.v.) hoặc dấu gạch đầu dòng (-) để dễ nhận diện
+- Mỗi task nên có format: "Tên task: Mô tả" hoặc "Tên task - Mô tả" để dễ parse
+- Mỗi task nên được viết trên một dòng riêng để dễ parse
+- Luôn nhớ quy trình SDLC với 6 giai đoạn chính khi đưa ra gợi ý
+- Mô tả task nên ngắn gọn, rõ ràng, giải thích công việc cần làm`
         });
 
         // Lưu lịch sử hội thoại lại (nếu có), hoặc khởi tạo mảng rỗng
         let conversationHistory = messages || [];
         
-        // Hàm helper kiểm tra nội dung message có phải là chọn mô hình phát triển phần mềm không
-        const isModelSelection = (content) => {
-            const lowerContent = content.toLowerCase();
-            // Danh sách các mô hình phổ biến để AI nhận diện
-            const models = ['scrum', 'waterfall', 'agile', 'kanban', 'devops', 'lean', 'xp', 'extreme programming', 'spiral', 'v-model'];
-            // Kiểm tra nội dung có nhắc đến mô hình và động từ chọn/dùng/theo/áp dụng...
-            return models.some(model => lowerContent.includes(model) && 
-                (lowerContent.includes('chọn') || lowerContent.includes('dùng') || lowerContent.includes('theo') || 
-                 lowerContent.includes('muốn') || lowerContent.includes('sử dụng') || lowerContent.includes('áp dụng')));
-        };
-        
-        // Kiểm tra xem user đã chọn mô hình phát triển nào chưa (trong lịch sử, trừ message cuối cùng)
-        const hasSelectedModel = conversationHistory.length > 1 && 
-            conversationHistory.slice(0, -1).some(msg => {
-                if (msg.role === 'user') {
-                    return isModelSelection(msg.content);
-                }
-                return false;
-            });
-        
-        // Nếu message rỗng (chưa có hội thoại), tự động gửi chào hỏi và giới thiệu quy trình SDLC
-        // Frontend có thể điều khiển, back-end đảm bảo mặc định user luôn được gợi mở
+        // Nếu message rỗng (chưa có hội thoại), tự động gửi câu hỏi khởi tạo
         if (conversationHistory.length === 0) {
-            const greeting = project_name 
-                ? `Xin chào! Tôi đang làm việc với dự án "${project_name}". Bạn muốn tôi gợi ý các task theo quy trình SDLC (Software Development Life Cycle) chuẩn không? Quy trình gồm 6 giai đoạn: Phân tích yêu cầu, Thiết kế hệ thống, Lập trình, Kiểm thử, Triển khai, và Bảo trì.`
-                : 'Xin chào! Tôi có thể giúp bạn quản lý dự án phần mềm theo quy trình SDLC (Software Development Life Cycle) chuẩn. Quy trình gồm 6 giai đoạn: Phân tích yêu cầu, Thiết kế hệ thống, Lập trình, Kiểm thử, Triển khai, và Bảo trì. Bạn muốn bắt đầu từ giai đoạn nào?';
+            let greeting = 'Xin chào! Tôi là trợ lý AI của bạn. ';
+            
+            // Nếu có danh sách dự án của người dùng, đưa vào câu hỏi
+            if (user_projects && user_projects.length > 0) {
+                greeting += `Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn?\n\nDanh sách các dự án hiện có của bạn:\n`;
+                user_projects.forEach((proj, idx) => {
+                    greeting += `${idx + 1}. ${proj.name}${proj.description ? ' - ' + proj.description : ''}\n`;
+                });
+                greeting += '\nVui lòng cho tôi biết bạn muốn chọn dự án nào hoặc bắt đầu dự án mới.';
+            } else {
+                greeting += 'Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn? (Hiện tại bạn chưa có dự án nào trong hệ thống)';
+            }
             
             conversationHistory.push({
                 role: 'user',
@@ -224,7 +215,7 @@ const chatWithAI = async (req, res, next) => {
                 });
             }
             
-            // Nâng cấp prompt để AI luôn gợi ý theo quy trình SDLC
+            // Nâng cấp prompt để AI luôn gợi ý theo dự án hoặc thông tin đã cho
             let enhancedMessage = lastMessage.content;
             
             // Nếu user yêu cầu gợi ý tasks hoặc đề cập đến dự án, thêm hướng dẫn về SDLC
@@ -233,10 +224,13 @@ const chatWithAI = async (req, res, next) => {
                                      lowerContent.includes('công việc') || 
                                      lowerContent.includes('gợi ý') ||
                                      lowerContent.includes('đề xuất') ||
-                                     lowerContent.includes('bắt đầu');
+                                     lowerContent.includes('phát triển');
             
-            if (isRequestingTasks || project_name) {
-                enhancedMessage = `${lastMessage.content}\n\nHãy đưa ra gợi ý các task cụ thể theo quy trình SDLC chuẩn với 6 giai đoạn: Requirement Analysis, System Design, Implementation, Testing, Deployment, và Maintenance. Mỗi task nên được liệt kê rõ ràng với số thứ tự hoặc dấu gạch đầu dòng, tên task ngắn gọn (tối đa 50 ký tự), kèm theo mô tả ngắn gọn (1-2 câu) giải thích công việc cần làm. Format: "1. Tên task: Mô tả" hoặc "1. Tên task - Mô tả".`;
+            // Nếu có project_name được chọn, thêm context về dự án đó
+            if (project_name) {
+                enhancedMessage = `Người dùng đã chọn dự án: "${project_name}". ${lastMessage.content}\n\nHãy đưa ra gợi ý các task cụ thể cho dự án này theo quy trình SDLC chuẩn với 6 giai đoạn. Mỗi task nên có format: "1. Tên task: Mô tả ngắn gọn" hoặc "1. Tên task - Mô tả ngắn gọn".`;
+            } else if (isRequestingTasks) {
+                enhancedMessage = `${lastMessage.content}\n\nHãy đưa ra gợi ý các task cụ thể theo quy trình SDLC chuẩn với 6 giai đoạn: Requirement Analysis, System Design, Implementation, Testing, Deployment, và Maintenance. Mỗi task nên được liệt kê rõ ràng với số thứ tự, tên task ngắn gọn (tối đa 50 ký tự), kèm theo mô tả ngắn gọn (1-2 câu). Format: "1. Tên task: Mô tả" hoặc "1. Tên task - Mô tả".`;
             }
             
             const result = await chat.sendMessage(enhancedMessage);
@@ -256,15 +250,9 @@ const chatWithAI = async (req, res, next) => {
             });
         } else {
             // Nếu chỉ có 1 message (thường là câu hỏi/mở đầu), dùng generateContent
-            // Prompt mặc định để AI luôn ưu tiên giới thiệu các mô hình phát triển phần mềm
             const firstMessage = conversationHistory[0].content;
             
-            // Thêm hướng dẫn yêu cầu AI giới thiệu quy trình SDLC và gợi ý tasks
-            const enhancedFirstMessage = project_name
-                ? `${firstMessage}\n\nHãy giới thiệu quy trình SDLC (Software Development Life Cycle) với 6 giai đoạn chính và đưa ra gợi ý các task cụ thể cho dự án "${project_name}" theo từng giai đoạn. Mỗi task nên được liệt kê rõ ràng với số thứ tự hoặc dấu gạch đầu dòng, tên task ngắn gọn kèm theo mô tả ngắn gọn (1-2 câu). Format: "1. Tên task: Mô tả" hoặc "1. Tên task - Mô tả".`
-                : `${firstMessage}\n\nHãy giới thiệu quy trình SDLC (Software Development Life Cycle) với 6 giai đoạn chính: Requirement Analysis, System Design, Implementation, Testing, Deployment, và Maintenance. Sau đó đưa ra gợi ý các task cụ thể cho từng giai đoạn. Mỗi task nên được liệt kê rõ ràng với số thứ tự hoặc dấu gạch đầu dòng, tên task ngắn gọn kèm theo mô tả ngắn gọn (1-2 câu). Format: "1. Tên task: Mô tả" hoặc "1. Tên task - Mô tả".`;
-            
-            const result = await model.generateContent(enhancedFirstMessage);
+            const result = await model.generateContent(firstMessage);
             const response = await result.response;
             let text = response.text();
             
