@@ -29,20 +29,9 @@ const getMyProjects = async (req, res, next) => {
         
         // Trong workspace context
         if (workspaceId) {
-            // PM trong workspace có thể xem tất cả projects trong workspace
-            if (currentRole === 'pm') {
-                projects = await Project.findAll(workspaceId);
-            } else {
-                // TL, MB, CLT chỉ xem projects họ được assign
-                const [rows] = await db.execute(`
-                    SELECT DISTINCT p.*
-                    FROM prj p
-                    INNER JOIN prj_mb pm ON p.id = pm.project_id
-                    WHERE pm.user_id = ? AND p.workspace_id = ?
-                    ORDER BY p.created_at DESC
-                `, [userId, workspaceId]);
-                projects = rows.map(r => new Project(r));
-            }
+            // Nếu user là member của workspace, cho phép xem tất cả projects trong workspace
+            // Điều này cho phép member chat và collaborate trong tất cả projects
+            projects = await Project.findAll(workspaceId);
         } else {
             // Global context (không có workspace)
             // PM và Admin có thể xem tất cả projects

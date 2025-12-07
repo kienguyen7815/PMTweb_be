@@ -40,13 +40,14 @@ const chatWithAI = async (req, res, next) => {
 
 1. Hỏi người dùng: "Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn?"
 
-2. Nếu người dùng chọn **dự án mới**:
+2. Nếu người dùng chọn **dự án mới** (các cụm từ như "dự án mới", "bắt đầu mới", "tạo mới", "khởi tạo dự án mới"):
+   - QUAN TRỌNG: Đây là dự án mới, KHÔNG phải dự án có sẵn
    - Hỏi thêm thông tin cơ bản về dự án mới (tên dự án, mục tiêu, lĩnh vực, ngân sách, thời gian dự kiến,…).
    - Gợi ý các bước và cấu trúc dự án phù hợp dựa trên thông tin đã cung cấp.
+   - Sau khi có đủ thông tin, đề xuất các task theo 6 giai đoạn SDLC phù hợp với dự án mới.
 
-3. Nếu người dùng chọn **dự án có sẵn**:
-   - Lấy danh sách các dự án hiện có của người dùng từ cơ sở dữ liệu.
-   - Hỏi người dùng chọn một dự án từ danh sách.
+3. Nếu người dùng chọn **dự án có sẵn** (chọn bằng số thứ tự, tên dự án, hoặc nói "phát triển dự án"):
+   - Xác nhận dự án mà người dùng đã chọn
    - Dựa trên dự án đã chọn, gợi ý các bước phát triển tiếp theo, cải thiện hoặc mở rộng dự án.
 
 Luôn giữ giao diện trả lời ngắn gọn, thân thiện và hướng dẫn người dùng từng bước một. Nếu cần, hỏi thêm thông tin chi tiết từ người dùng để đưa ra gợi ý tốt nhất.

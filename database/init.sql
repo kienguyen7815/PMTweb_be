@@ -1,4 +1,3 @@
--- Tạo database
 CREATE DATABASE IF NOT EXISTS taskhub_db;
 USE taskhub_db;
 
@@ -20,9 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
-
--- 2. Table Workspaces - Không gian làm việc
+-- Workspaces - Không gian làm việc
 CREATE TABLE IF NOT EXISTS workspaces (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -32,8 +29,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
     FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 2.1. Table Workspace Members - Thành viên trong từng không gian làm việc
--- Mỗi user có role riêng theo từng workspace
+-- Workspace Members
 CREATE TABLE IF NOT EXISTS workspace_members (
     id INT AUTO_INCREMENT PRIMARY KEY,
     workspace_id INT NOT NULL,
@@ -45,8 +41,7 @@ CREATE TABLE IF NOT EXISTS workspace_members (
     UNIQUE KEY unique_workspace_user (workspace_id, user_id)
 );
 
-
--- 3. Table prj - Quản lý thông tin dự án
+-- Projects
 CREATE TABLE IF NOT EXISTS prj (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -61,7 +56,7 @@ CREATE TABLE IF NOT EXISTS prj (
     FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
 );
 
--- 4. Table Project Members - Quản lý thành viên từng dự án
+-- Project Members
 CREATE TABLE IF NOT EXISTS prj_mb (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT,
@@ -73,7 +68,7 @@ CREATE TABLE IF NOT EXISTS prj_mb (
     UNIQUE KEY unique_project_user (project_id, user_id)
 );
 
--- 5. Table Tasks - Quản lý các công việc trong dự án
+-- Tasks
 CREATE TABLE IF NOT EXISTS tasks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT,
@@ -86,7 +81,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     FOREIGN KEY (project_id) REFERENCES prj(id) ON DELETE CASCADE
 );
 
--- 6. Table Task Assignments - Quản lý giao việc cho từng người
+-- Task Assignments
 CREATE TABLE IF NOT EXISTS tsk_asg (
     id INT AUTO_INCREMENT PRIMARY KEY,
     task_id INT,
@@ -97,7 +92,7 @@ CREATE TABLE IF NOT EXISTS tsk_asg (
     UNIQUE KEY unique_task_user (task_id, user_id)
 );
 
--- 7. Table Task Comments - Chat theo task
+-- Task Comments
 CREATE TABLE IF NOT EXISTS tsk_cmt (
     id INT AUTO_INCREMENT PRIMARY KEY,
     task_id INT,
@@ -108,7 +103,7 @@ CREATE TABLE IF NOT EXISTS tsk_cmt (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 7.1. Table Project Comments - Chat theo project
+-- Project Comments
 CREATE TABLE IF NOT EXISTS prj_cmt (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT NOT NULL,
@@ -119,18 +114,7 @@ CREATE TABLE IF NOT EXISTS prj_cmt (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 8. Table Documents - Quản lý liên kết tài liệu Google
-CREATE TABLE IF NOT EXISTS docs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    project_id INT,
-    file_id VARCHAR(255) NOT NULL,
-    type ENUM('doc', 'sheet', 'ppt') NOT NULL,
-    url TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (project_id) REFERENCES prj(id) ON DELETE CASCADE
-);
-
--- 9. Table Activity Logs - Theo dõi toàn bộ hành động
+-- Activity Logs
 CREATE TABLE IF NOT EXISTS logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -142,7 +126,7 @@ CREATE TABLE IF NOT EXISTS logs (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 10. Table Notifications - Thông báo hệ thống
+-- Notifications
 CREATE TABLE IF NOT EXISTS ntf (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -152,7 +136,7 @@ CREATE TABLE IF NOT EXISTS ntf (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 11. Table Members - Quản lý thông tin thành viên
+-- Members
 CREATE TABLE IF NOT EXISTS members (
     id INT AUTO_INCREMENT PRIMARY KEY,
     workspace_id INT NULL,
@@ -185,24 +169,17 @@ CREATE INDEX idx_ntf_user_id ON ntf(user_id);
 CREATE INDEX idx_ntf_is_read ON ntf(is_read);
 CREATE INDEX idx_members_email ON members(email);
 
--- Migration: Thêm cột workspace_id vào bảng members (nếu chưa có)
 ALTER TABLE members ADD COLUMN workspace_id INT NULL;
 ALTER TABLE members ADD CONSTRAINT fk_members_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE;
 CREATE INDEX idx_members_workspace_id ON members(workspace_id);
 
--- Migration: Thêm cột workspace_id vào bảng prj (nếu chưa có)
 ALTER TABLE prj ADD COLUMN workspace_id INT NULL;
 ALTER TABLE prj ADD CONSTRAINT fk_prj_workspace FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL;
 CREATE INDEX idx_prj_workspace_id ON prj(workspace_id);
 
--- Migration: Thêm cột role vào bảng users (nếu chưa có)
 ALTER TABLE users ADD COLUMN role ENUM('user', 'admin') DEFAULT 'user';
 
--- ========================================
--- ADMIN PANEL SETUP
--- ========================================
-
--- 12. Table System Settings - Cấu hình hệ thống (cho Admin Panel)
+-- System Settings
 CREATE TABLE IF NOT EXISTS system_settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
     setting_key VARCHAR(100) NOT NULL UNIQUE,
@@ -213,7 +190,6 @@ CREATE TABLE IF NOT EXISTS system_settings (
     FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- Insert default system settings
 INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 ('site_name', 'TaskHub', 'Tên website'),
 ('maintenance_mode', 'false', 'Chế độ bảo trì'),
@@ -222,23 +198,11 @@ INSERT INTO system_settings (setting_key, setting_value, description) VALUES
 ('allow_registration', 'true', 'Cho phép đăng ký tài khoản mới')
 ON DUPLICATE KEY UPDATE setting_key = setting_key;
 
--- ========================================
--- ADMIN PANEL INDEXES (Optimization)
--- ========================================
-
--- Index for admin user role queries
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-
--- Index for admin activity logs queries
 CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_logs_action ON logs(action);
 CREATE INDEX IF NOT EXISTS idx_logs_target_table ON logs(target_table);
 
--- ========================================
--- ADMIN PANEL PROCEDURES
--- ========================================
-
--- Procedure to log admin activities
 DELIMITER //
 CREATE PROCEDURE IF NOT EXISTS log_admin_activity(
     IN p_user_id INT,
@@ -253,11 +217,6 @@ BEGIN
 END //
 DELIMITER ;
 
--- ========================================
--- ADMIN PANEL VIEWS
--- ========================================
-
--- View for quick admin dashboard stats
 CREATE OR REPLACE VIEW admin_dashboard_stats AS
 SELECT 
     (SELECT COUNT(*) FROM users) as total_users,
@@ -268,42 +227,3 @@ SELECT
     (SELECT COUNT(*) FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) as new_users_this_month,
     (SELECT COUNT(*) FROM prj WHERE status = 'In Progress') as active_projects,
     (SELECT COUNT(*) FROM tasks WHERE status = 'In Progress') as active_tasks;
-
--- ========================================
--- SAMPLE ADMIN USER (Optional - Uncomment to use)
--- ========================================
-
--- Create a default admin user for testing
--- IMPORTANT: Change the email and password in production!
-
-/*
-INSERT INTO users (username, email, password, role, created_at) 
-VALUES (
-    'Admin User', 
-    'admin@taskhub.com', 
-    -- Password: 'admin123' hashed with bcrypt (10 rounds)
-    '$2a$10$8K1p/a0dL3LzjmGXfIQKNOYfRwfqj7vJ1QN3xQXqxN4xYmQN5qX3m',
-    'admin',
-    NOW()
-)
-ON DUPLICATE KEY UPDATE role = 'admin';
-*/
-
--- Or manually update an existing user to admin:
--- UPDATE users SET role = 'admin' WHERE email = 'your-email@example.com';
-
--- ========================================
--- VERIFICATION
--- ========================================
-
--- Check if database setup completed successfully
-SELECT 'Database setup completed successfully!' as status, NOW() as setup_time;
-
--- Display current admin users
-SELECT id, username, email, role, created_at 
-FROM users 
-WHERE role = 'admin'
-ORDER BY created_at DESC;
-
--- Display system stats from view
-SELECT * FROM admin_dashboard_stats;
