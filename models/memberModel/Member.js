@@ -17,10 +17,10 @@ class Member {
         try {
             const { name, email, date_of_birth, occupation, workspace_id = null } = memberData;
             
-            // Kiểm tra email đã tồn tại chưa
-            const existingMember = await this.findByEmail(email);
+            // Kiểm tra email đã tồn tại trong workspace này chưa
+            const existingMember = await this.findByEmail(email, workspace_id);
             if (existingMember) {
-                throw new Error('Email đã được sử dụng');
+                throw new Error('Email đã được sử dụng trong workspace này');
             }
 
             const query = `
@@ -42,11 +42,19 @@ class Member {
         }
     }
 
-    // Tìm member theo email
-    static async findByEmail(email) {
+    // Tìm member theo email (có thể lọc theo workspace)
+    static async findByEmail(email, workspaceId = null) {
         try {
-            const query = 'SELECT * FROM members WHERE email = ?';
-            const [rows] = await db.execute(query, [email]);
+            let query = 'SELECT * FROM members WHERE email = ?';
+            const params = [email];
+            
+            // Nếu có workspaceId, chỉ tìm trong workspace đó
+            if (workspaceId !== null) {
+                query += ' AND workspace_id = ?';
+                params.push(workspaceId);
+            }
+            
+            const [rows] = await db.execute(query, params);
             
             if (rows.length === 0) {
                 return null;

@@ -1,6 +1,7 @@
 const Member = require('../../models/memberModel/Member');
 const User = require('../../models/userModel/User');
 const WorkspaceMember = require('../../models/workspaceModel/WorkspaceMember');
+const Log = require('../../models/logModel/Log');
 
 // Lấy danh sách members theo phân quyền
 const getAll = async (req, res, next) => {
@@ -30,6 +31,15 @@ const getAll = async (req, res, next) => {
         const workspaceId = req.workspaceId || null;
         const members = await Member.findAll(currentRole, workspaceId);
 
+        // Ghi log
+        await Log.create({
+            user_id: currentUser.id,
+            action: 'VIEW_MEMBERS',
+            target_table: 'members',
+            target_id: null,
+            description: `Xem danh sách thành viên${workspaceId ? ` trong workspace ${workspaceId}` : ''} (${members.length} thành viên)`
+        });
+
         res.json({
             success: true,
             data: members.map(member => member.toJSON())
@@ -55,6 +65,18 @@ const getById = async (req, res, next) => {
             return res.status(403).json({
                 success: false,
                 message: 'Thành viên không thuộc workspace hiện tại'
+            });
+        }
+
+        // Ghi log
+        const currentUser = req.user;
+        if (currentUser) {
+            await Log.create({
+                user_id: currentUser.id,
+                action: 'VIEW_MEMBER',
+                target_table: 'members',
+                target_id: member.id,
+                description: `Xem thông tin thành viên: ${member.name} (${member.email})`
             });
         }
         
@@ -123,12 +145,12 @@ const create = async (req, res, next) => {
             });
         }
         
-        // Kiểm tra email đã tồn tại trong table members cùng workspace chưa
-        const existingMember = await Member.findByEmail(email.trim());
-        if (existingMember && (!existingMember.workspace_id || existingMember.workspace_id === workspaceId)) {
+        // Kiểm tra email đã tồn tại trong workspace này chưa
+        const existingMember = await Member.findByEmail(email.trim(), workspaceId);
+        if (existingMember) {
             return res.status(400).json({ 
                 success: false, 
-                message: 'Email này đã được sử dụng trong danh sách thành viên' 
+                message: 'Email này đã được sử dụng trong workspace này' 
             });
         }
         
@@ -141,6 +163,18 @@ const create = async (req, res, next) => {
             occupation: occupation && occupation.trim() ? occupation.trim() : null
         });
 
+        // Ghi log
+        const currentUser = req.user;
+        if (currentUser) {
+            await Log.create({
+                user_id: currentUser.id,
+                action: 'CREATE_MEMBER',
+                target_table: 'members',
+                target_id: member.id,
+                description: `Thêm thành viên mới: ${member.name} (${member.email})${workspaceId ? ` vào workspace ${workspaceId}` : ''}`
+            });
+        }
+
         // Nếu có workspace context và tồn tại user trong hệ thống với email này,
         // tự động thêm user đó vào workspace_members để khi đăng nhập sẽ thấy workspace.
         if (workspaceId) {
@@ -152,6 +186,15 @@ const create = async (req, res, next) => {
                         workspace_id: workspaceId,
                         user_id: existingUser.id,
                         role: 'mb'
+                    });
+
+                    // Ghi log cho việc thêm vào workspace
+                    await Log.create({
+                        user_id: currentUser.id,
+                        action: 'ADD_WORKSPACE_MEMBER',
+                        target_table: 'workspace_members',
+                        target_id: workspaceId,
+                        description: `Tự động thêm user ${existingUser.username} (${existingUser.email}) vào workspace ${workspaceId} khi tạo member`
                     });
                 }
             } catch (linkErr) {
@@ -230,12 +273,13 @@ const update = async (req, res, next) => {
                 });
             }
             
-            // Kiểm tra email mới đã tồn tại chưa
-            const existingMember = await Member.findByEmail(email.trim());
+            // Kiểm tra email mới đã tồn tại trong workspace này chưa
+            const workspaceId = req.workspaceId || member.workspace_id;
+            const existingMember = await Member.findByEmail(email.trim(), workspaceId);
             if (existingMember && existingMember.id !== member.id) {
                 return res.status(400).json({ 
                     success: false, 
-                    message: 'Email này đã được sử dụng bởi thành viên khác' 
+                    message: 'Email này đã được sử dụng bởi thành viên khác trong workspace này' 
                 });
             }
         }
@@ -278,6 +322,19 @@ const update = async (req, res, next) => {
         
         // Cập nhật thông tin
         await member.update(updateData);
+
+        // Ghi log
+        const currentUser = req.user;
+        if (currentUser) {
+            const changedFields = Object.keys(updateData).join(', ');
+            await Log.create({
+                user_id: currentUser.id,
+                action: 'UPDATE_MEMBER',
+                target_table: 'members',
+                target_id: member.id,
+                description: `Cập nhật thông tin thành viên: ${member.name} (${member.email}) - Thay đổi: ${changedFields}`
+            });
+        }
         
         res.json({
             success: true,
@@ -303,7 +360,25 @@ const remove = async (req, res, next) => {
             });
         }
 
+        const memberInfo = {
+            name: member.name,
+            email: member.email,
+            workspace_id: member.workspace_id
+        };
+
         await member.delete();
+
+        // Ghi log
+        const currentUser = req.user;
+        if (currentUser) {
+            await Log.create({
+                user_id: currentUser.id,
+                action: 'DELETE_MEMBER',
+                target_table: 'members',
+                target_id: req.params.id,
+                description: `Xóa thành viên: ${memberInfo.name} (${memberInfo.email})${memberInfo.workspace_id ? ` khỏi workspace ${memberInfo.workspace_id}` : ''}`
+            });
+        }
         
         res.json({
             success: true,
@@ -367,6 +442,18 @@ const searchEmails = async (req, res, next) => {
                 email: member.email
             };
         });
+
+        // Ghi log
+        const currentUser = req.user;
+        if (currentUser) {
+            await Log.create({
+                user_id: currentUser.id,
+                action: 'SEARCH_MEMBERS',
+                target_table: 'members',
+                target_id: null,
+                description: `Tìm kiếm thành viên với từ khóa: "${query.trim()}" - Tìm thấy ${results.length} kết quả`
+            });
+        }
 
         res.json({
             success: true,
