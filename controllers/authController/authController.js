@@ -3,7 +3,7 @@ const { generateToken } = require('../../middleware/auth');
 
 class AuthController {
     // Đăng ký tài khoản mới, không cho phép client tự set role = admin
-    static async register(req, res, next) => {
+    static async register(req, res, next) {
         try {
             const { username, email, password, role, phone } = req.body;
 
