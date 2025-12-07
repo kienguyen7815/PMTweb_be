@@ -12,13 +12,11 @@ const db = mysql.createPool({
     queueLimit: 0,
     enableKeepAlive: true,
     keepAliveInitialDelay: 0,
-    // Connection pool settings
     idleTimeout: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
-    // Connection timeout for individual connections
     connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT || '10000', 10)
 });
 
-// Test connection on startup
+// Kiểm tra kết nối database khi khởi động ứng dụng
 db.getConnection()
     .then(connection => {
         console.log('Database connected successfully');

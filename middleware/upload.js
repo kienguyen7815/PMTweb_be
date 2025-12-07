@@ -2,7 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Tạo thư mục uploads/avatars nếu chưa tồn tại
+// Tạo thư mục nếu chưa tồn tại để lưu file upload
 const uploadsDir = path.join(__dirname, '../uploads');
 const avatarsDir = path.join(__dirname, '../uploads/avatars');
 
@@ -13,14 +13,13 @@ if (!fs.existsSync(avatarsDir)) {
   fs.mkdirSync(avatarsDir, { recursive: true });
 }
 
-// Cấu hình storage
+// Cấu hình nơi lưu và tên file
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, avatarsDir);
   },
   filename: (req, file, cb) => {
-    // Tạo tên file: userId_timestamp.extension
-    // req.user sẽ có sau khi authenticateToken middleware chạy
+    // Format tên file: userId_timestamp.extension để tránh trùng lặp
     const userId = req.user?.id || req.user?.userId || 'unknown';
     const timestamp = Date.now();
     const ext = path.extname(file.originalname).toLowerCase();
@@ -29,9 +28,9 @@ const storage = multer.diskStorage({
   }
 });
 
-// Filter chỉ chấp nhận file ảnh
+// Chỉ cho phép upload file ảnh với các định dạng phổ biến
 const fileFilter = (req, file, cb) => {
-  // Kiểm tra nếu không có file
+  // Kiểm tra có file không
   if (!file) {
     return cb(new Error('Không có file được upload'));
   }
@@ -47,7 +46,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Cấu hình multer
+// Cấu hình Multer với giới hạn kích thước và bộ lọc file
 const upload = multer({
   storage: storage,
   limits: {
