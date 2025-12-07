@@ -35,7 +35,7 @@ const chatWithAI = async (req, res, next) => {
 
         // Promt trò chuyện vói Ai
         const model = genAI.getGenerativeModel({ 
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-flash-lite',
             systemInstruction: `Bạn là một trợ lý AI giúp người dùng quản lý và phát triển dự án. Khi người dùng nhấn vào AI:
 
 1. Hỏi người dùng: "Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn?"
@@ -128,7 +128,7 @@ QUAN TRỌNG:
         // Lưu lịch sử hội thoại lại (nếu có), hoặc khởi tạo mảng rỗng
         let conversationHistory = messages || [];
         
-        // Nếu message rỗng (chưa có hội thoại), tự động gửi câu hỏi khởi tạo
+        // Nếu message rỗng (chưa có hội thoại), AI sẽ hỏi người dùng chọn dự án
         if (conversationHistory.length === 0) {
             let greeting = 'Xin chào! Tôi là trợ lý AI của bạn. ';
             
@@ -138,14 +138,19 @@ QUAN TRỌNG:
                 user_projects.forEach((proj, idx) => {
                     greeting += `${idx + 1}. ${proj.name}${proj.description ? ' - ' + proj.description : ''}\n`;
                 });
-                greeting += '\nVui lòng cho tôi biết bạn muốn chọn dự án nào hoặc bắt đầu dự án mới.';
+                greeting += '\nVui lòng cho tôi biết bạn muốn chọn dự án nào (bằng số hoặc tên dự án) hoặc nói "dự án mới" để bắt đầu một dự án mới.';
             } else {
-                greeting += 'Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn? (Hiện tại bạn chưa có dự án nào trong hệ thống)';
+                greeting += 'Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn?\n\n(Hiện tại bạn chưa có dự án nào trong hệ thống, vui lòng cho tôi biết thông tin về dự án mới của bạn)';
             }
             
-            conversationHistory.push({
-                role: 'user',
-                content: greeting
+            // Trả về greeting trực tiếp thay vì push vào conversationHistory
+            return res.json({
+                success: true,
+                data: {
+                    message: greeting,
+                    role: 'assistant',
+                    content: greeting
+                }
             });
         }
 
@@ -295,7 +300,7 @@ const generateTaskSuggestions = async (req, res, next) => {
             });
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
         // Prompt cho Gemini yêu cầu xuất đề xuất task theo quy trình SDLC chuẩn
         const prompt = `Dựa trên quy trình SDLC (Software Development Life Cycle) chuẩn với 6 giai đoạn, hãy đề xuất danh sách các task cần quản lý cho dự án có tên: "${project_name.trim()}".
