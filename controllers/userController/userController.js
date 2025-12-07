@@ -308,19 +308,19 @@ const getAvailableMembers = async (req, res, next) => {
         let sql;
         const params = [];
         
-        // Nếu có workspace context, join với workspace_members để lấy role
+        // Nếu có workspace context, chỉ lấy members trong workspace
         if (workspaceId) {
             sql = `
-                SELECT u.id, u.username, u.email, u.phone, u.avatar,
-                       COALESCE(wm.role, NULL) as role
+                SELECT u.id, u.username, u.email, u.phone, u.avatar, wm.role
                 FROM users u
-                LEFT JOIN workspace_members wm ON u.id = wm.user_id AND wm.workspace_id = ?
+                INNER JOIN workspace_members wm ON u.id = wm.user_id
+                WHERE wm.workspace_id = ?
             `;
             params.push(workspaceId);
             
             // If query provided, search by username or email
             if (query.trim()) {
-                sql += ` WHERE (u.username LIKE ? OR u.email LIKE ?)`;
+                sql += ` AND (u.username LIKE ? OR u.email LIKE ?)`;
                 const searchPattern = `%${query.trim()}%`;
                 params.push(searchPattern, searchPattern);
             }

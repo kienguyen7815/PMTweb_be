@@ -31,12 +31,35 @@ const getProjectStats = async (req, res, next) => {
 const getTaskStats = async (req, res, next) => {
     try {
         const workspaceId = req.workspaceId;
+        
+        // First, get all possible task statuses from ENUM
+        const [enumRows] = await db.execute(`
+            SELECT COLUMN_TYPE 
+            FROM information_schema.COLUMNS 
+            WHERE TABLE_SCHEMA = ? 
+              AND TABLE_NAME = 'tasks' 
+              AND COLUMN_NAME = 'status'
+        `, [process.env.DB_NAME]);
+        
+        let statuses = [];
+        if (enumRows.length > 0 && enumRows[0].COLUMN_TYPE) {
+            const enumMatch = enumRows[0].COLUMN_TYPE.match(/enum\((.*)\)/i);
+            if (enumMatch && enumMatch[1]) {
+                statuses = enumMatch[1]
+                    .split(',')
+                    .map(val => val.trim().replace(/^'(.*)'$/, '$1'));
+            }
+        }
+        
+        // Build dynamic CASE statements for each status
+        const statusCases = statuses.map(status => 
+            `SUM(CASE WHEN t.status = '${status}' THEN 1 ELSE 0 END) as \`${status}\``
+        ).join(',\n                ');
+        
         let query = `
             SELECT 
                 COUNT(*) as total,
-                SUM(CASE WHEN t.status = 'To Do' THEN 1 ELSE 0 END) as to_do,
-                SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
-                SUM(CASE WHEN t.status = 'Done' THEN 1 ELSE 0 END) as done,
+                ${statusCases},
                 AVG(t.progress) as avg_progress
             FROM tasks t
             JOIN prj p ON t.project_id = p.id
@@ -50,7 +73,14 @@ const getTaskStats = async (req, res, next) => {
         }
 
         const [rows] = await db.execute(query, params);
-        res.json({ success: true, data: rows[0] });
+        
+        // Format response to include status array
+        const result = {
+            ...rows[0],
+            statuses: statuses
+        };
+        
+        res.json({ success: true, data: result });
     } catch (err) {
         next(err);
     }

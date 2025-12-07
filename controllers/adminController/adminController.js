@@ -3,7 +3,6 @@ const User = require('../../models/userModel/User');
 const Workspace = require('../../models/workspaceModel/Workspace');
 const Project = require('../../models/projectModel/Project');
 
-// ========== DASHBOARD OVERVIEW ==========
 
 // Get dashboard statistics
 const getDashboardStats = async (req, res, next) => {
