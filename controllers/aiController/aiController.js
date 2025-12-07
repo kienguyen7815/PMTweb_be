@@ -35,18 +35,19 @@ const chatWithAI = async (req, res, next) => {
 
         // Promt trò chuyện vói Ai
         const model = genAI.getGenerativeModel({ 
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-flash-lite',
             systemInstruction: `Bạn là một trợ lý AI giúp người dùng quản lý và phát triển dự án. Khi người dùng nhấn vào AI:
 
 1. Hỏi người dùng: "Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn?"
 
-2. Nếu người dùng chọn **dự án mới**:
+2. Nếu người dùng chọn **dự án mới** (các cụm từ như "dự án mới", "bắt đầu mới", "tạo mới", "khởi tạo dự án mới"):
+   - QUAN TRỌNG: Đây là dự án mới, KHÔNG phải dự án có sẵn
    - Hỏi thêm thông tin cơ bản về dự án mới (tên dự án, mục tiêu, lĩnh vực, ngân sách, thời gian dự kiến,…).
    - Gợi ý các bước và cấu trúc dự án phù hợp dựa trên thông tin đã cung cấp.
+   - Sau khi có đủ thông tin, đề xuất các task theo 6 giai đoạn SDLC phù hợp với dự án mới.
 
-3. Nếu người dùng chọn **dự án có sẵn**:
-   - Lấy danh sách các dự án hiện có của người dùng từ cơ sở dữ liệu.
-   - Hỏi người dùng chọn một dự án từ danh sách.
+3. Nếu người dùng chọn **dự án có sẵn** (chọn bằng số thứ tự, tên dự án, hoặc nói "phát triển dự án"):
+   - Xác nhận dự án mà người dùng đã chọn
    - Dựa trên dự án đã chọn, gợi ý các bước phát triển tiếp theo, cải thiện hoặc mở rộng dự án.
 
 Luôn giữ giao diện trả lời ngắn gọn, thân thiện và hướng dẫn người dùng từng bước một. Nếu cần, hỏi thêm thông tin chi tiết từ người dùng để đưa ra gợi ý tốt nhất.
@@ -128,7 +129,7 @@ QUAN TRỌNG:
         // Lưu lịch sử hội thoại lại (nếu có), hoặc khởi tạo mảng rỗng
         let conversationHistory = messages || [];
         
-        // Nếu message rỗng (chưa có hội thoại), tự động gửi câu hỏi khởi tạo
+        // Nếu message rỗng (chưa có hội thoại), AI sẽ hỏi người dùng chọn dự án
         if (conversationHistory.length === 0) {
             let greeting = 'Xin chào! Tôi là trợ lý AI của bạn. ';
             
@@ -138,14 +139,19 @@ QUAN TRỌNG:
                 user_projects.forEach((proj, idx) => {
                     greeting += `${idx + 1}. ${proj.name}${proj.description ? ' - ' + proj.description : ''}\n`;
                 });
-                greeting += '\nVui lòng cho tôi biết bạn muốn chọn dự án nào hoặc bắt đầu dự án mới.';
+                greeting += '\nVui lòng cho tôi biết bạn muốn chọn dự án nào (bằng số hoặc tên dự án) hoặc nói "dự án mới" để bắt đầu một dự án mới.';
             } else {
-                greeting += 'Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn? (Hiện tại bạn chưa có dự án nào trong hệ thống)';
+                greeting += 'Bạn muốn bắt đầu một dự án mới hay phát triển từ dự án có sẵn?\n\n(Hiện tại bạn chưa có dự án nào trong hệ thống, vui lòng cho tôi biết thông tin về dự án mới của bạn)';
             }
             
-            conversationHistory.push({
-                role: 'user',
-                content: greeting
+            // Trả về greeting trực tiếp thay vì push vào conversationHistory
+            return res.json({
+                success: true,
+                data: {
+                    message: greeting,
+                    role: 'assistant',
+                    content: greeting
+                }
             });
         }
 
@@ -295,7 +301,7 @@ const generateTaskSuggestions = async (req, res, next) => {
             });
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
 
         // Prompt cho Gemini yêu cầu xuất đề xuất task theo quy trình SDLC chuẩn
         const prompt = `Dựa trên quy trình SDLC (Software Development Life Cycle) chuẩn với 6 giai đoạn, hãy đề xuất danh sách các task cần quản lý cho dự án có tên: "${project_name.trim()}".

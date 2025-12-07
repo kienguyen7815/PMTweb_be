@@ -46,23 +46,6 @@ app.use(cors(corsOptions));
 // Nén response để giảm băng thông
 app.use(compression());
 
-// Giới hạn số request để chống tấn công brute force
-if (NODE_ENV === 'production') {
-  const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10),
-    message: 'Too many requests from this IP, please try again later.',
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => {
-      return req.path.includes('/socket.io');
-    }
-  });
-  app.use('/api/', limiter);
-  console.log('Rate limiting enabled for production');
-} else {
-  console.log('Rate limiting disabled for development');
-}
 
 // Xử lý JSON và URL-encoded data từ request body
 const bodySizeLimit = process.env.BODY_SIZE_LIMIT || '10mb';
