@@ -1,6 +1,6 @@
 const { body, validationResult } = require('express-validator');
 
-// Validation middleware cho đăng ký
+// Kiểm tra dữ liệu đầu vào khi đăng ký tài khoản
 const validateRegister = [
   body('username')
     .trim()
@@ -36,7 +36,7 @@ const validateRegister = [
     .isIn(['mb', 'pm', 'admin'])
     .withMessage('Vai trò không hợp lệ'),
 
-  // Middleware để xử lý kết quả validation
+  // Xử lý kết quả validation và trả về lỗi nếu có
   (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -53,7 +53,7 @@ const validateRegister = [
   }
 ];
 
-// Validation middleware cho đăng nhập
+// Kiểm tra dữ liệu đầu vào khi đăng nhập
 const validateLogin = [
   body('email')
     .trim()
@@ -83,7 +83,7 @@ const validateLogin = [
   }
 ];
 
-// Validation middleware cho cập nhật profile
+// Kiểm tra dữ liệu khi cập nhật thông tin cá nhân
 const validateUpdateProfile = [
   body('username')
     .optional()
@@ -161,7 +161,7 @@ const validateUpdateProfile = [
   }
 ];
 
-// Validation middleware cho đổi mật khẩu
+// Kiểm tra dữ liệu khi đổi mật khẩu
 const validateChangePassword = [
   body('currentPassword')
     .notEmpty()

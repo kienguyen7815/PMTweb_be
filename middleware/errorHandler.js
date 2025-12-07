@@ -1,7 +1,7 @@
 const errorHandler = (err, req, res, next) => {
     console.error('Error:', err);
 
-    // Lỗi từ JWT
+    // Xử lý lỗi JWT hết hạn hoặc không hợp lệ
     if (err.name === 'JsonWebTokenError') {
         return res.status(401).json({
             success: false,
@@ -16,7 +16,7 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
-    // Lỗi từ MySQL
+    // Xử lý lỗi duplicate key từ database
     if (err.code === 'ER_DUP_ENTRY') {
         return res.status(400).json({
             success: false,
@@ -24,6 +24,7 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
+    // Xử lý lỗi foreign key không hợp lệ
     if (err.code === 'ER_NO_REFERENCED_ROW_2') {
         return res.status(400).json({
             success: false,
@@ -31,7 +32,7 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
-    // Lỗi validation
+    // Xử lý lỗi validation từ middleware
     if (err.name === 'ValidationError') {
         return res.status(400).json({
             success: false,
@@ -39,7 +40,7 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
-    // Lỗi từ Multer (file upload)
+    // Xử lý lỗi upload file từ Multer
     if (err.name === 'MulterError') {
         let message = 'Lỗi khi upload file';
         if (err.code === 'LIMIT_FILE_SIZE') {
@@ -55,7 +56,7 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
-    // Lỗi từ file filter (multer)
+    // Xử lý lỗi khi file không đúng định dạng cho phép
     if (err.message && err.message.includes('Chỉ chấp nhận file ảnh')) {
         return res.status(400).json({
             success: false,
@@ -63,7 +64,7 @@ const errorHandler = (err, req, res, next) => {
         });
     }
 
-    // Lỗi mặc định
+    // Xử lý lỗi chung, trả về thông tin chi tiết trong development
     const statusCode = err.statusCode || 500;
     const message = err.message || 'Lỗi server nội bộ';
 

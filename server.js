@@ -17,12 +17,11 @@ const userRoutes = require('./routes/userRoutes');
 const memberRoutes = require('./routes/memberRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const projectCommentRoutes = require('./routes/projectCommentRoutes');
-const documentRoutes = require('./routes/documentRoutes');
-const logRoutes = require('./routes/logRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const workspaceRoutes = require('./routes/workspaceRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 
@@ -33,10 +32,10 @@ const app = express();
 const PORT = process.env.PORT || 3036;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Security middleware
+// Bảo mật headers HTTP để tránh các lỗ hổng phổ biến
 app.use(helmet());
 
-// CORS configuration
+// Cấu hình CORS cho phép frontend truy cập
 const corsOptions = {
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
@@ -44,33 +43,43 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Compression middleware
+// Nén response để giảm băng thông
 app.use(compression());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // Default: 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10), // Default: 100 requests per window
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
+// Giới hạn số request để chống tấn công brute force
+if (NODE_ENV === 'production') {
+  const limiter = rateLimit({
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10),
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+      return req.path.includes('/socket.io');
+    }
+  });
+  app.use('/api/', limiter);
+  console.log('Rate limiting enabled for production');
+} else {
+  console.log('Rate limiting disabled for development');
+}
 
-// Body parsing middleware
+// Xử lý JSON và URL-encoded data từ request body
 const bodySizeLimit = process.env.BODY_SIZE_LIMIT || '10mb';
 app.use(express.json({ limit: bodySizeLimit }));
 app.use(express.urlencoded({ extended: true, limit: bodySizeLimit }));
 
-// Serve static files (avatars)
+// Phục vụ file tĩnh như ảnh avatar
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Logging middleware (only in development)
+// Ghi log request để debug và giám sát
 if (NODE_ENV === 'development') {
   app.use(morgan('dev'));
 } else {
   app.use(morgan('combined'));
 }
 
-// Health check endpoint
+// Endpoint kiểm tra tình trạng server
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
@@ -79,7 +88,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes
+// Định tuyến các API endpoints
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
@@ -88,14 +97,13 @@ app.use('/api/users', userRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/project-comments', projectCommentRoutes);
-app.use('/api/documents', documentRoutes);
-app.use('/api/logs', logRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/workspaces', workspaceRoutes);
+app.use('/api/admin', adminRoutes);
 
-// 404 handler
+// Xử lý route không tồn tại
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -103,22 +111,22 @@ app.use((req, res) => {
   });
 });
 
-// Error handling middleware (must be last)
+// Middleware xử lý lỗi tập trung, phải đặt cuối cùng
 app.use(errorHandler);
 
-// Create HTTP server
+// Tạo HTTP server để tích hợp Socket.io
 const server = http.createServer(app);
 
-// Initialize Socket.io
+// Khởi tạo WebSocket để giao tiếp real-time
 initializeSocket(server);
 
-// Start server
+// Khởi động server trên port đã cấu hình
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT} in ${NODE_ENV} mode`);
   console.log(`Socket.io initialized and ready for connections`);
 });
 
-// Graceful shutdown
+// Tắt server khi nhận tín hiệu kết thúc từ hệ điều hành
 process.on('SIGTERM', () => {
   console.log('SIGTERM signal received: closing HTTP server');
   process.exit(0);

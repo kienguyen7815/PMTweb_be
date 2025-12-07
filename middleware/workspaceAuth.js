@@ -1,26 +1,19 @@
 const WorkspaceMember = require('../models/workspaceModel/WorkspaceMember');
 
 /**
- * Middleware để lấy role của user trong workspace từ bảng workspace_members
- * Role sẽ được lưu vào req.workspaceRole
- * 
- * Có thể lấy workspace_id từ:
- * - req.body.workspace_id
- * - req.query.workspace_id
- * - req.params.workspace_id
- * - req.headers['x-workspace-id']
- * 
- * Hoặc từ project_id nếu có (thông qua project.workspace_id)
+ * Lấy role của user trong workspace cụ thể để phân quyền chính xác
+ * Workspace ID có thể lấy từ body, query, params hoặc header
+ * Nếu không có workspace_id, có thể lấy từ project_id
  */
 const getWorkspaceRole = async (req, res, next) => {
     try {
-        // Lấy workspace_id từ các nguồn khác nhau
+        // Thử lấy workspace_id từ nhiều nguồn khác nhau
         let workspaceId = req.body?.workspace_id || 
                          req.query?.workspace_id || 
                          req.params?.workspace_id ||
                          req.headers['x-workspace-id'];
 
-        // Nếu không có workspace_id trực tiếp, thử lấy từ project_id
+        // Nếu không có workspace_id, thử lấy từ project_id
         if (!workspaceId) {
             const projectId = req.body?.project_id || 
                              req.query?.project_id || 
@@ -39,14 +32,14 @@ const getWorkspaceRole = async (req, res, next) => {
             }
         }
 
-        // Nếu vẫn không có workspace_id, không set workspaceRole
+        // Không có workspace context nào, bỏ qua middleware này
         if (!workspaceId) {
             req.workspaceRole = null;
             req.workspaceId = null;
             return next();
         }
 
-        // Lấy role từ workspace_members
+        // Lấy role của user trong workspace này từ bảng workspace_members
         const member = await WorkspaceMember.findByWorkspaceAndUser(
             parseInt(workspaceId),
             req.user.id
@@ -64,7 +57,7 @@ const getWorkspaceRole = async (req, res, next) => {
 
         next();
     } catch (error) {
-        // Nếu có lỗi, không block request, chỉ không set workspaceRole
+        // Không chặn request nếu có lỗi, chỉ không set workspaceRole
         req.workspaceRole = null;
         req.workspaceId = null;
         req.workspaceMember = null;
@@ -73,14 +66,14 @@ const getWorkspaceRole = async (req, res, next) => {
 };
 
 /**
- * Helper function để lấy role hiện tại (ưu tiên workspace role, fallback về user role)
+ * Lấy role hiện tại, ưu tiên workspace role nếu có
  */
 const getCurrentRole = (req) => {
     return req.workspaceRole || req.user?.role || null;
 };
 
 /**
- * Middleware kiểm tra user có phải là thành viên của workspace không
+ * Kiểm tra user có phải thành viên của workspace không
  */
 const requireWorkspaceMember = async (req, res, next) => {
     if (!req.workspaceId) {

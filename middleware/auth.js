@@ -1,16 +1,16 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/userModel/User');
 
-// Simple in-memory cache for user data (optional optimization)
+// Cache tạm thời để tránh truy vấn database nhiều lần cho cùng user
 const userCache = new Map();
 const CACHE_TTL = parseInt(process.env.AUTH_CACHE_TTL || '300000', 10); // Default: 5 minutes
 const CACHE_MAX_SIZE = parseInt(process.env.AUTH_CACHE_MAX_SIZE || '100', 10); // Default: 100 entries
 
-// Middleware xác thực JWT
+// Xác thực JWT token từ header Authorization
 const authenticateToken = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
-        const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+        const token = authHeader && authHeader.split(' ')[1];
 
         if (!token) {
             return res.status(401).json({
@@ -30,7 +30,7 @@ const authenticateToken = async (req, res, next) => {
 
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        // Check cache first
+        // Kiểm tra cache trước khi truy vấn database
         const cacheKey = `user_${decoded.userId}`;
         const cached = userCache.get(cacheKey);
         
@@ -39,7 +39,7 @@ const authenticateToken = async (req, res, next) => {
             return next();
         }
         
-        // Lấy thông tin user từ database
+        // Lấy thông tin user từ database để xác nhận tồn tại
         const user = await User.findById(decoded.userId);
         if (!user) {
             return res.status(401).json({
@@ -48,13 +48,13 @@ const authenticateToken = async (req, res, next) => {
             });
         }
 
-        // Cache user data
+        // Lưu vào cache để giảm tải database
         userCache.set(cacheKey, {
             user,
             timestamp: Date.now()
         });
         
-        // Clean old cache entries (simple cleanup)
+        // Dọn dẹp cache khi vượt quá giới hạn
         if (userCache.size > CACHE_MAX_SIZE) {
             const now = Date.now();
             for (const [key, value] of userCache.entries()) {
@@ -86,27 +86,28 @@ const authenticateToken = async (req, res, next) => {
     }
 };
 
-// Helper function để lấy role hiện tại (ưu tiên workspace role, fallback về user role)
+// Lấy role hiện tại của user, ưu tiên workspace role nếu có
 const getCurrentRole = (req) => {
-    // Nếu có workspace role, ưu tiên dùng workspace role
-    // Admin role chỉ áp dụng ở global scope (không có workspace)
+    // Workspace role chỉ áp dụng trong phạm vi workspace cụ thể
     if (req.workspaceRole) {
         return req.workspaceRole;
     }
-    // Nếu không có workspace, dùng user role
+    // Sử dụng user role toàn cục nếu không có workspace context
     return req.user?.role || null;
 };
 
-// Middleware kiểm tra quyền admin (chỉ global, không áp dụng trong workspace)
+// Kiểm tra quyền admin cấp toàn hệ thống
 const requireAdmin = (req, res, next) => {
-    // Admin chỉ áp dụng ở global scope
+    // Admin chỉ có hiệu lực ở phạm vi toàn cục
     if (req.workspaceRole) {
         return res.status(403).json({
             success: false,
             message: 'Tính năng này chỉ dành cho Admin ở global scope'
         });
     }
-    if (req.user.role !== 'ad') {
+    // Chấp nhận cả viết tắt 'ad' và đầy đủ 'admin'
+    const userRole = String(req.user.role).toLowerCase();
+    if (userRole !== 'ad' && userRole !== 'admin') {
         return res.status(403).json({
             success: false,
             message: 'Chỉ admin mới có quyền truy cập'
@@ -115,11 +116,10 @@ const requireAdmin = (req, res, next) => {
     next();
 };
 
-// Middleware kiểm tra quyền PM hoặc Admin
+// Kiểm tra quyền PM hoặc Admin để thực hiện thao tác quan trọng
 const requirePMOrAdmin = (req, res, next) => {
     const currentRole = getCurrentRole(req);
-    // Trong workspace: chỉ PM
-    // Global: Admin hoặc PM
+    // Workspace: chỉ PM mới có quyền
     if (req.workspaceRole) {
         if (currentRole !== 'pm') {
             return res.status(403).json({
@@ -128,6 +128,7 @@ const requirePMOrAdmin = (req, res, next) => {
             });
         }
     } else {
+        // Toàn cục: Admin hoặc PM
         if (!['ad', 'pm'].includes(currentRole)) {
             return res.status(403).json({
                 success: false,
@@ -138,11 +139,10 @@ const requirePMOrAdmin = (req, res, next) => {
     next();
 };
 
-// Middleware kiểm tra quyền Team Leader, PM hoặc Admin
+// Kiểm tra quyền Team Leader trở lên (TL, PM, Admin)
 const requireLeaderOrAbove = (req, res, next) => {
     const currentRole = getCurrentRole(req);
-    // Trong workspace: PM hoặc TL
-    // Global: Admin, PM, hoặc TL
+    // Workspace: PM hoặc TL
     if (req.workspaceRole) {
         if (!['pm', 'tl'].includes(currentRole)) {
             return res.status(403).json({
@@ -151,6 +151,7 @@ const requireLeaderOrAbove = (req, res, next) => {
             });
         }
     } else {
+        // Toàn cục: Admin, PM hoặc TL
         if (!['ad', 'pm', 'tl'].includes(currentRole)) {
             return res.status(403).json({
                 success: false,
@@ -161,11 +162,10 @@ const requireLeaderOrAbove = (req, res, next) => {
     next();
 };
 
-// Middleware kiểm tra quyền xem (tất cả role)
+// Kiểm tra quyền xem, áp dụng cho tất cả role có trong hệ thống
 const requireViewPermission = (req, res, next) => {
     const currentRole = getCurrentRole(req);
-    // Trong workspace: PM, TL, MB, CLT
-    // Global: Admin, PM, TL, MB
+    // Workspace: PM, TL, MB, CLT
     if (req.workspaceRole) {
         if (!['pm', 'tl', 'mb', 'clt'].includes(currentRole)) {
             return res.status(403).json({
@@ -174,6 +174,7 @@ const requireViewPermission = (req, res, next) => {
             });
         }
     } else {
+        // Toàn cục: Admin, PM, TL, MB
         if (!['ad', 'pm', 'tl', 'mb'].includes(currentRole)) {
             return res.status(403).json({
                 success: false,
@@ -184,11 +185,10 @@ const requireViewPermission = (req, res, next) => {
     next();
 };
 
-// Middleware kiểm tra quyền chỉnh sửa (TL, PM, Admin)
+// Kiểm tra quyền chỉnh sửa, chỉ TL, PM hoặc Admin
 const requireEditPermission = (req, res, next) => {
     const currentRole = getCurrentRole(req);
-    // Trong workspace: PM hoặc TL
-    // Global: Admin, PM, hoặc TL
+    // Workspace: PM hoặc TL
     if (req.workspaceRole) {
         if (!['pm', 'tl'].includes(currentRole)) {
             return res.status(403).json({
@@ -197,6 +197,7 @@ const requireEditPermission = (req, res, next) => {
             });
         }
     } else {
+        // Toàn cục: Admin, PM hoặc TL
         if (!['ad', 'pm', 'tl'].includes(currentRole)) {
             return res.status(403).json({
                 success: false,
@@ -207,11 +208,10 @@ const requireEditPermission = (req, res, next) => {
     next();
 };
 
-// Middleware kiểm tra quyền quản lý thành viên (TL, PM, Admin)
+// Kiểm tra quyền quản lý thành viên trong project/workspace
 const requireMemberManagement = (req, res, next) => {
     const currentRole = getCurrentRole(req);
-    // Trong workspace: PM hoặc TL (TL có thể xem available members để assign task)
-    // Global: Admin, PM, hoặc TL
+    // Workspace: PM hoặc TL (TL có thể xem danh sách để assign task)
     if (req.workspaceRole) {
         if (!['pm', 'tl'].includes(currentRole)) {
             return res.status(403).json({
@@ -220,6 +220,7 @@ const requireMemberManagement = (req, res, next) => {
             });
         }
     } else {
+        // Toàn cục: Admin, PM hoặc TL
         if (!['ad', 'pm', 'tl'].includes(currentRole)) {
             return res.status(403).json({
                 success: false,
@@ -230,11 +231,10 @@ const requireMemberManagement = (req, res, next) => {
     next();
 };
 
-// Middleware kiểm tra quyền xem thành viên (tất cả role)
+// Kiểm tra quyền xem danh sách thành viên
 const requireViewMembers = (req, res, next) => {
     const currentRole = getCurrentRole(req);
-    // Trong workspace: PM, TL, MB, CLT
-    // Global: Admin, PM, TL, MB
+    // Workspace: PM, TL, MB, CLT
     if (req.workspaceRole) {
         if (!['pm', 'tl', 'mb', 'clt'].includes(currentRole)) {
             return res.status(403).json({
@@ -243,6 +243,7 @@ const requireViewMembers = (req, res, next) => {
             });
         }
     } else {
+        // Toàn cục: Admin, PM, TL, MB
         if (!['ad', 'pm', 'tl', 'mb'].includes(currentRole)) {
             return res.status(403).json({
                 success: false,
@@ -253,11 +254,10 @@ const requireViewMembers = (req, res, next) => {
     next();
 };
 
-// Middleware kiểm tra quyền search members (cho phép tất cả thành viên trong workspace search)
+// Kiểm tra quyền tìm kiếm thành viên (tất cả role đều có quyền)
 const requireSearchMembers = (req, res, next) => {
     const currentRole = getCurrentRole(req);
-    // Trong workspace: PM, TL, MB, CLT đều có thể search
-    // Global: Admin, PM, TL, MB
+    // Workspace: PM, TL, MB, CLT
     if (req.workspaceRole) {
         if (!['pm', 'tl', 'mb', 'clt'].includes(currentRole)) {
             return res.status(403).json({
@@ -266,6 +266,7 @@ const requireSearchMembers = (req, res, next) => {
             });
         }
     } else {
+        // Toàn cục: Admin, PM, TL, MB
         if (!['ad', 'pm', 'tl', 'mb'].includes(currentRole)) {
             return res.status(403).json({
                 success: false,
@@ -276,7 +277,7 @@ const requireSearchMembers = (req, res, next) => {
     next();
 };
 
-// Tạo JWT token
+// Tạo JWT token chứa userId với thời gian hết hạn
 const generateToken = (userId) => {
     const JWT_SECRET = process.env.JWT_SECRET;
     if (!JWT_SECRET) {
