@@ -1,11 +1,7 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-// Khởi tạo đối tượng Gemini AI với API key từ biến môi trường
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// ============= CONSTANTS & CONFIGS =============
-
-// System instruction đơn giản - trò chuyện tự nhiên
+// CONSTANTS & CONFIGS 
 const SYSTEM_INSTRUCTION = `Bạn là một trợ lý AI thân thiện, giống như một người bạn đồng nghiệp trong lĩnh vực công nghệ và quản lý dự án.
 
 CÁCH TRÒ CHUYỆN:
@@ -70,25 +66,24 @@ LƯU Ý:
 - Chỉ đi sâu vào chi tiết khi người dùng yêu cầu
 - Có thể hỏi ngắn gọn, không cần câu dài`;
 
-// Quy trình SDLC chuẩn
 const SDLC_PHASES = {
-	"Requirement Analysis":
-		"Phân tích yêu cầu - Thu thập yêu cầu, xác định chức năng, viết SRS, Use case",
-	"System Design":
-		"Thiết kế hệ thống - Kiến trúc, Database ERD, UI/UX wireframe, chọn công nghệ",
-	Implementation:
-		"Lập trình - Xây dựng backend API, frontend UI, coding convention, bảo mật, unit test",
-	Testing:
-		"Kiểm thử - Unit test, Integration test, System test, UAT, Performance test, Security test",
-	Deployment:
-		"Triển khai - Build & deploy qua CI/CD, cấu hình server, quản lý phiên bản",
-	Maintenance:
-		"Bảo trì & cải tiến - Theo dõi logs, cập nhật tính năng, tối ưu hiệu năng",
+  "Requirement Analysis":
+    "Thu thập và phân tích yêu cầu - Hiểu bài toán, xác định phạm vi, viết SRS, use case, user story",
+  "System & Technical Design":
+    "Thiết kế hệ thống - Kiến trúc, database, API, UI/UX, lựa chọn công nghệ",
+  "Development":
+    "Phát triển - Lập trình backend, frontend, tích hợp hệ thống, code review",
+  "Testing & Quality Assurance":
+    "Đảm bảo chất lượng - Unit test, integration test, UAT, kiểm tra hiệu năng và bảo mật",
+  "Deployment & Release":
+    "Triển khai - Build, CI/CD, cấu hình môi trường, phát hành sản phẩm",
+  "Maintenance & Improvement":
+    "Vận hành & cải tiến - Fix bug, theo dõi hệ thống, tối ưu và nâng cấp tính năng",
 };
+
 
 const VALID_PHASES = Object.keys(SDLC_PHASES);
 
-// Template JSON mẫu cho AI
 const JSON_TEMPLATE = `[
   {
     "name": "Tên task ngắn gọn",
@@ -97,9 +92,7 @@ const JSON_TEMPLATE = `[
   }
 ]`;
 
-// ============= HELPER FUNCTIONS =============
-
-// Hàm helper để loại bỏ định dạng markdown khỏi văn bản
+// HELPER FUNCTIONS 
 const removeMarkdown = (text) => {
 	if (!text) return text;
 	let cleaned = text
@@ -119,11 +112,7 @@ const removeMarkdown = (text) => {
 // Hàm cắt description không phá vỡ câu
 const truncateDescription = (text, maxLength = 1000) => {
 	if (!text || text.length <= maxLength) return text;
-
-	// Cắt tại maxLength
 	let truncated = text.substring(0, maxLength);
-
-	// Tìm dấu chấm cuối cùng hoặc dấu xuống dòng
 	const lastPeriod = truncated.lastIndexOf(".");
 	const lastNewline = truncated.lastIndexOf("\n");
 	const cutPoint = Math.max(lastPeriod, lastNewline);
@@ -160,7 +149,6 @@ const parseTasksFromResponse = (aiResponse) => {
 	let currentPhase = null;
 	let currentSection = null;
 
-	// Patterns để nhận diện
 	const phasePattern =
 		/^(?:Giai đoạn\s*\d+|Phase\s*\d+)[\s:]*(.+?)(?:\s*-\s*(.+))?$/i;
 	const sectionPattern =
@@ -172,7 +160,6 @@ const parseTasksFromResponse = (aiResponse) => {
 		const line = lines[i].trim();
 		if (!line) continue;
 
-		// Kiểm tra xem có phải header của giai đoạn không
 		const phaseMatch = line.match(phasePattern);
 		if (phaseMatch) {
 			currentPhase = phaseMatch[1].trim();
@@ -180,20 +167,17 @@ const parseTasksFromResponse = (aiResponse) => {
 			continue;
 		}
 
-		// Kiểm tra section header (ví dụ: "REQUIREMENT ANALYSIS" hoặc "Phân tích yêu cầu")
 		const sectionMatch = line.match(sectionPattern);
 		if (sectionMatch) {
 			currentSection = mapToSDLCPhase(sectionMatch[1].trim());
 			continue;
 		}
 
-		// Kiểm tra task với format: "1. Tên task: Mô tả" hoặc "1. Tên task - Mô tả"
 		const taskMatch = line.match(taskPattern);
 		if (taskMatch) {
 			const taskName = taskMatch[2].trim();
 			const taskDesc = taskMatch[3].trim();
 
-			// Bỏ qua nếu là tiêu đề (quá ngắn hoặc toàn chữ hoa)
 			if (taskName.length < 5 || taskName === taskName.toUpperCase()) {
 				continue;
 			}
@@ -206,17 +190,14 @@ const parseTasksFromResponse = (aiResponse) => {
 			continue;
 		}
 
-		// Kiểm tra task đơn giản: "1. Tên task"
 		const simpleMatch = line.match(simpleTaskPattern);
 		if (simpleMatch) {
 			const taskName = simpleMatch[2].trim();
 
-			// Bỏ qua nếu là tiêu đề
 			if (taskName.length < 5 || taskName === taskName.toUpperCase()) {
 				continue;
 			}
 
-			// Lấy dòng tiếp theo làm mô tả nếu không phải số thứ tự mới
 			let description = "";
 			if (i + 1 < lines.length) {
 				const nextLine = lines[i + 1].trim();
@@ -244,33 +225,37 @@ const mapToSDLCPhase = (text) => {
 
 	// Mapping rules
 	const phaseMap = {
-		requirement: "Requirement Analysis",
-		"yêu cầu": "Requirement Analysis",
-		"phân tích": "Requirement Analysis",
-		analysis: "Requirement Analysis",
+	  requirement: "Requirement Analysis",
+	  "yêu cầu": "Requirement Analysis",
+	  "phân tích": "Requirement Analysis",
+	  analysis: "Requirement Analysis",
+	
+	  design: "System & Technical Design",
+	  "thiết kế": "System & Technical Design",
+	  architecture: "System & Technical Design",
+	  technical: "System & Technical Design",
+	
+	  implementation: "Development",
+	  development: "Development",
+	  coding: "Development",
+	  "lập trình": "Development",
+	
+	  testing: "Testing & Quality Assurance",
+	  test: "Testing & Quality Assurance",
+	  qa: "Testing & Quality Assurance",
+	  "kiểm thử": "Testing & Quality Assurance",
+	
+	  deployment: "Deployment & Release",
+	  deploy: "Deployment & Release",
+	  release: "Deployment & Release",
+	  "triển khai": "Deployment & Release",
+	
+	  maintenance: "Maintenance & Improvement",
+	  maintain: "Maintenance & Improvement",
+	  improvement: "Maintenance & Improvement",
+	  "bảo trì": "Maintenance & Improvement",
+};
 
-		design: "System Design",
-		"thiết kế": "System Design",
-		system: "System Design",
-
-		implementation: "Implementation",
-		"lập trình": "Implementation",
-		coding: "Implementation",
-		"phát triển": "Implementation",
-		development: "Implementation",
-
-		testing: "Testing",
-		"kiểm thử": "Testing",
-		test: "Testing",
-
-		deployment: "Deployment",
-		"triển khai": "Deployment",
-		deploy: "Deployment",
-
-		maintenance: "Maintenance",
-		"bảo trì": "Maintenance",
-		maintain: "Maintenance",
-	};
 
 	for (const [key, phase] of Object.entries(phaseMap)) {
 		if (normalized.includes(key)) {
@@ -288,29 +273,22 @@ const analyzeResponse = (aiResponse, userMessage) => {
 	}
 
 	const lowerResponse = aiResponse.toLowerCase();
-
-	// Parse tasks từ response
 	const parsedTasks = parseTasksFromResponse(aiResponse);
 
-	// Nếu có ít nhất 3 tasks được parse, coi là task_list
 	if (parsedTasks.length >= 3) {
 		return {
 			type: "task_list",
 			tasks: parsedTasks,
 		};
 	}
-
-	// Kiểm tra xem có phải danh sách task không (dựa vào số thứ tự)
 	const numberedItems = aiResponse.match(/^\s*\d+[\.\)]/gm);
 	if (numberedItems && numberedItems.length >= 3) {
-		// Có nhiều items nhưng parse không được → vẫn coi là task list nhưng cần parse thủ công
 		return {
 			type: "task_list",
-			tasks: parsedTasks, // Có thể rỗng hoặc ít items
+			tasks: parsedTasks, 
 		};
 	}
-
-	// Kiểm tra từ khóa SDLC
+	
 	const sdlcKeywords = [
 		/requirement analysis/i,
 		/system design/i,
@@ -331,14 +309,13 @@ const analyzeResponse = (aiResponse, userMessage) => {
 		};
 	}
 
-	// Mặc định là info (greeting, hướng dẫn, câu hỏi)
 	return {
 		type: "info",
 		tasks: [],
 	};
 };
 
-// Hàm chuẩn hóa lịch sử hội thoại
+
 const normalizeHistory = (messages) => {
 	if (!messages || messages.length === 0) return [];
 
@@ -354,13 +331,10 @@ const normalizeHistory = (messages) => {
 		});
 	}
 
-	// QUAN TRỌNG: Gemini API yêu cầu history phải bắt đầu với 'user'
-	// Nếu message đầu tiên là 'model', loại bỏ nó
 	if (history.length > 0 && history[0].role !== "user") {
 		history.shift();
 	}
 
-	// Nếu sau khi loại bỏ, vẫn có 2 message cùng role liên tiếp, loại bỏ message model đầu
 	while (history.length > 1 && history[0].role === "model") {
 		history.shift();
 	}
@@ -368,14 +342,10 @@ const normalizeHistory = (messages) => {
 	return history;
 };
 
-// ============= MAIN HANDLERS =============
-
-// Hàm chat với AI - Đơn giản và tự nhiên
+//  MAIN HANDLERS
 const chatWithAI = async (req, res, next) => {
 	try {
 		const { messages, project_name, user_projects } = req.body;
-
-		// Kiểm tra API key
 		if (!process.env.GEMINI_API_KEY) {
 			return res.status(500).json({
 				success: false,
@@ -383,14 +353,11 @@ const chatWithAI = async (req, res, next) => {
 			});
 		}
 
-		// Khởi tạo model - Bỏ systemInstruction vì SDK v0.21.0 có thể chưa hỗ trợ
 		const model = genAI.getGenerativeModel({
-			model: "gemini-2.5-flash-lite", // Gemini 2.5 Flash Lite
+			model: "gemini-2.5-flash-lite", 
 		});
 
 		let conversationHistory = messages || [];
-
-		// === KHỞI TẠO HỘI THOẠI ===
 		if (conversationHistory.length === 0) {
 			let greeting =
 				"Xin chào! Tôi là trợ lý AI của bạn. Tôi có thể giúp bạn lập kế hoạch và quản lý dự án. Bạn muốn làm gì hôm nay?";
@@ -424,10 +391,7 @@ const chatWithAI = async (req, res, next) => {
 		}
 
 		const userMessage = lastMessage.content.trim();
-
-		// === XỬ LÝ LỆNH /export ===
 		if (userMessage.toLowerCase().startsWith("/export")) {
-			// Tìm context dự án từ lịch sử hội thoại
 			let projectContext = "";
 			for (let i = conversationHistory.length - 1; i >= 0; i--) {
 				const msg = conversationHistory[i];
@@ -496,16 +460,12 @@ const chatWithAI = async (req, res, next) => {
 			});
 		}
 
-		// === TRÒ CHUYỆN BỘT THƯỜNG ===
 		const history = normalizeHistory(conversationHistory.slice(0, -1));
-
-		// Thêm SYSTEM_INSTRUCTION vào message đầu tiên (vì SDK cũ không hỗ trợ systemInstruction param)
 		let enhancedMessage = userMessage;
 		if (project_name) {
 			enhancedMessage = `[Dự án hiện tại: ${project_name}]\n\n${userMessage}`;
 		}
 
-		// Nếu history rỗng, thêm system instruction vào message
 		if (history.length === 0) {
 			enhancedMessage = `${SYSTEM_INSTRUCTION}\n\n---\n\nUser: ${enhancedMessage}`;
 		}
@@ -513,7 +473,7 @@ const chatWithAI = async (req, res, next) => {
 		const chat = model.startChat({
 			history: history,
 			generationConfig: {
-				temperature: 0.8, // Tăng để tự nhiên hơn
+				temperature: 0.1, 
 				topK: 40,
 				topP: 0.95,
 				maxOutputTokens: 2048,
@@ -524,10 +484,8 @@ const chatWithAI = async (req, res, next) => {
 		const response = await result.response;
 		let text = response.text();
 
-		// Loại bỏ markdown
 		text = removeMarkdown(text);
 
-		// Phân tích và parse tasks
 		const analysis = analyzeResponse(text, userMessage);
 
 		res.json({
@@ -565,20 +523,16 @@ const chatWithAI = async (req, res, next) => {
 	}
 };
 
-// Hàm gợi ý task cho dự án dựa trên tên project
 const generateTaskSuggestions = async (req, res, next) => {
 	try {
 		const { project_name, project_context } = req.body;
 
-		// Kiểm tra đầu vào có tên project không
 		if (!project_name || !project_name.trim()) {
 			return res.status(400).json({
 				success: false,
 				message: "project_name là bắt buộc",
 			});
 		}
-
-		// Kiểm tra API key đã cài
 		if (!process.env.GEMINI_API_KEY) {
 			return res.status(500).json({
 				success: false,
@@ -587,10 +541,9 @@ const generateTaskSuggestions = async (req, res, next) => {
 		}
 
 		const model = genAI.getGenerativeModel({
-			model: "gemini-2.5-flash-lite", // Gemini 2.5 Flash Lite
+			model: "gemini-2.5-flash-lite", 
 		});
 
-		// Xây dựng context dự án
 		let projectInfo = `Tên dự án: ${project_name.trim()}`;
 
 		if (project_context) {
@@ -608,52 +561,41 @@ const generateTaskSuggestions = async (req, res, next) => {
 			}
 		}
 
-		// Prompt cải tiến với template JSON và hướng dẫn chi tiết
 		const prompt = `Dựa trên quy trình SDLC (Software Development Life Cycle) chuẩn với 6 giai đoạn, hãy đề xuất danh sách các task cần quản lý cho dự án sau:
-
-${projectInfo}
-
-THÔNG TIN VỀ 6 GIAI ĐOẠN SDLC:
-${Object.entries(SDLC_PHASES)
-	.map(([phase, desc]) => `- ${phase}: ${desc}`)
-	.join("\n")}
-
-YÊU CẦU:
-1. Tạo ĐÚNG 20 TASKS, phân bổ đều cho 6 giai đoạn SDLC (khoảng 3-4 tasks/giai đoạn)
-2. Mỗi task phải có:
-   - name: Tên ngắn gọn, rõ ràng (tối đa 50 ký tự)
-   - description: Mô tả cụ thể công việc cần làm (1-3 câu)
-   - phase: Phải thuộc 1 trong 6 giai đoạn: ${VALID_PHASES.join(", ")}
-3. Tasks phải thực tế, khả thi, phù hợp với context dự án
-4. Ưu tiên các tasks quan trọng và cần thiết nhất
-5. QUAN TRỌNG: Chỉ trả về JSON array thuần túy, KHÔNG có text mở đầu, giải thích, hoặc kết thúc
-
-VÍ DỤ FORMAT JSON MONG MUỐN (ĐÚNG):
-${JSON_TEMPLATE}
-
-SAI: không được thêm text như "Dưới đây là...", "json code block", "Hy vọng...", etc.
-
-Hãy trả về JSON array với ĐÚNG 20 tasks ngay bây giờ:`;
+			${projectInfo}
+			THÔNG TIN VỀ 6 GIAI ĐOẠN SDLC:
+			${Object.entries(SDLC_PHASES)
+				.map(([phase, desc]) => `- ${phase}: ${desc}`)
+				.join("\n")}
+			YÊU CẦU:
+			1. Tạo khoảng 18–22 tasks, hệ thống sẽ tự chọn 20 task phù hợp nhất, phân bổ đều cho 6 giai đoạn SDLC (khoảng 3-4 tasks/giai đoạn)
+			2. Mỗi task phải có:
+			   - name: Tên ngắn gọn, rõ ràng (tối đa 50 ký tự)
+			   - description: Mô tả cụ thể công việc cần làm (1-3 câu)
+			   - phase: Phải thuộc 1 trong 6 giai đoạn: ${VALID_PHASES.join(", ")}
+			3. Tasks phải thực tế, khả thi, phù hợp với context dự án
+			4. Ưu tiên các tasks quan trọng và cần thiết nhất
+			5. QUAN TRỌNG: Chỉ trả về JSON array thuần túy, KHÔNG có text mở đầu, giải thích, hoặc kết thúc
+			VÍ DỤ FORMAT JSON MONG MUỐN (ĐÚNG):
+			${JSON_TEMPLATE}
+			SAI: không được thêm text như "Dưới đây là...", "json code block", "Hy vọng...", etc.
+			Tạo khoảng 18–22 tasks, hệ thống sẽ tự chọn 20 task phù hợp nhất;`;
 
 		const result = await model.generateContent(prompt);
 		const response = await result.response;
 		const text = response.text();
 
-		// Xử lý parse dữ liệu JSON từ phản hồi của AI với nhiều fallback
 		let tasks = [];
 		let parseError = null;
 
 		try {
-			// Thử 1: Parse trực tiếp
 			tasks = JSON.parse(text);
 		} catch (e1) {
 			try {
-				// Thử 2: Tìm JSON array trong code block markdown
 				const jsonMatch = text.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
 				if (jsonMatch) {
 					tasks = JSON.parse(jsonMatch[1]);
 				} else {
-					// Thử 3: Tìm JSON array đơn giản
 					const simpleMatch = text.match(/\[[\s\S]*\]/);
 					if (simpleMatch) {
 						tasks = JSON.parse(simpleMatch[0]);
@@ -668,7 +610,6 @@ Hãy trả về JSON array với ĐÚNG 20 tasks ngay bây giờ:`;
 			}
 		}
 
-		// Nếu không parse được JSON, trả lỗi chi tiết
 		if (parseError || !Array.isArray(tasks)) {
 			return res.status(500).json({
 				success: false,
@@ -678,13 +619,10 @@ Hãy trả về JSON array với ĐÚNG 20 tasks ngay bây giờ:`;
 			});
 		}
 
-		// Validate và format tasks
 		const formattedTasks = tasks
 			.filter((task) => {
-				// Kiểm tra các trường bắt buộc
 				if (!task.name || !task.name.trim()) return false;
 
-				// Kiểm tra phase hợp lệ
 				if (task.phase && !isValidPhase(task.phase)) {
 					console.warn(`Invalid phase "${task.phase}" for task "${task.name}"`);
 					return false;
@@ -722,7 +660,6 @@ Hãy trả về JSON array với ĐÚNG 20 tasks ngay bây giờ:`;
 	} catch (err) {
 		console.error("AI Error:", err);
 
-		// Xử lý lỗi chi tiết
 		if (err.message && err.message.includes("API key")) {
 			return res.status(500).json({
 				success: false,
