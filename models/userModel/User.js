@@ -8,8 +8,7 @@ class User {
         this.email = data.email;
         this.password = data.password;
         this.phone = data.phone;
-        // Global role: chuẩn hóa về 'user' hoặc 'admin' (không phải role trong workspace)
-        // Hỗ trợ cả giá trị cũ 'ad' -> map thành 'admin'
+
         if (!data.role) {
             this.role = 'user';
         } else {
