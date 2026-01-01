@@ -7,6 +7,7 @@ const db = mysql.createPool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    charset: 'utf8mb4',
     waitForConnections: true,
     connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
     queueLimit: 0,
@@ -19,6 +20,8 @@ const db = mysql.createPool({
 // Kiểm tra kết nối database khi khởi động ứng dụng
 db.getConnection()
     .then(connection => {
+        // Set charset UTF8MB4 cho connection
+        connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
         console.log('Database connected successfully');
         connection.release();
     })

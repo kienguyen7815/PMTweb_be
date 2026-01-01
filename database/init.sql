@@ -1,5 +1,11 @@
-CREATE DATABASE IF NOT EXISTS taskhub_db;
-USE taskhub_db;
+CREATE DATABASE IF NOT EXISTS pmtweb 
+CHARACTER SET utf8mb4 
+COLLATE utf8mb4_unicode_ci;
+USE pmtweb;
+
+-- Set default charset for all tables
+SET NAMES utf8mb4;
+SET CHARACTER SET utf8mb4;
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -17,7 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar VARCHAR(255) DEFAULT NULL,
     role ENUM('user', 'admin') DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Workspaces - Không gian làm việc
 CREATE TABLE IF NOT EXISTS workspaces (
@@ -227,3 +233,18 @@ SELECT
     (SELECT COUNT(*) FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) as new_users_this_month,
     (SELECT COUNT(*) FROM prj WHERE status = 'In Progress') as active_projects,
     (SELECT COUNT(*) FROM tasks WHERE status = 'In Progress') as active_tasks;
+
+-- Convert all tables to UTF8MB4 charset
+ALTER TABLE users CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE workspaces CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE workspace_members CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE prj CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE prj_mb CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE tasks CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE tsk_asg CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE tsk_cmt CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE prj_cmt CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE logs CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE ntf CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE members CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE system_settings CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
