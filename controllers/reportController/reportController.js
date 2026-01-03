@@ -1,6 +1,6 @@
 const db = require('../../config/db');
 
-// Get project statistics
+// Thống kê dự án
 const getProjectStats = async (req, res, next) => {
     try {
         const workspaceId = req.workspaceId;
@@ -14,7 +14,7 @@ const getProjectStats = async (req, res, next) => {
         `;
         const params = [];
 
-        // Nếu có workspace context -> chỉ thống kê projects trong workspace đó
+        // Nếu có context workspace -> chỉ thống kê các dự án trong workspace đó
         if (workspaceId) {
             query += ' WHERE workspace_id = ?';
             params.push(workspaceId);
@@ -27,12 +27,12 @@ const getProjectStats = async (req, res, next) => {
     }
 };
 
-// Get task statistics
+// Thống kê task
 const getTaskStats = async (req, res, next) => {
     try {
         const workspaceId = req.workspaceId;
         
-        // First, get all possible task statuses from ENUM
+        // Lấy danh sách tất cả các trạng thái nhiệm vụ từ ENUM của cột status
         const [enumRows] = await db.execute(`
             SELECT COLUMN_TYPE 
             FROM information_schema.COLUMNS 
@@ -51,7 +51,7 @@ const getTaskStats = async (req, res, next) => {
             }
         }
         
-        // Build dynamic CASE statements for each status
+        // Tạo các câu CASE động cho từng trạng thái
         const statusCases = statuses.map(status => 
             `SUM(CASE WHEN t.status = '${status}' THEN 1 ELSE 0 END) as \`${status}\``
         ).join(',\n                ');
@@ -66,7 +66,7 @@ const getTaskStats = async (req, res, next) => {
         `;
         const params = [];
 
-        // Nếu có workspace context -> chỉ thống kê tasks của projects trong workspace đó
+        // Nếu có workspace context -> chỉ thống kê các nhiệm vụ của dự án thuộc workspace đó
         if (workspaceId) {
             query += ' WHERE p.workspace_id = ?';
             params.push(workspaceId);
@@ -74,7 +74,7 @@ const getTaskStats = async (req, res, next) => {
 
         const [rows] = await db.execute(query, params);
         
-        // Format response to include status array
+        // Định dạng phản hồi để bao gồm cả mảng trạng thái
         const result = {
             ...rows[0],
             statuses: statuses
@@ -86,7 +86,7 @@ const getTaskStats = async (req, res, next) => {
     }
 };
 
-// Get task progress by project
+// Thống kê tiến độ task theo dự án
 const getTaskProgressByProject = async (req, res, next) => {
     try {
         const workspaceId = req.workspaceId;
@@ -116,7 +116,7 @@ const getTaskProgressByProject = async (req, res, next) => {
     }
 };
 
-// Get tasks by month (for chart)
+// Thống kê số lượng task theo tháng (cho biểu đồ)
 const getTasksByMonth = async (req, res, next) => {
     try {
         const workspaceId = req.workspaceId;
@@ -154,7 +154,7 @@ const getTasksByMonth = async (req, res, next) => {
     }
 };
 
-// Get user activity stats
+// Thống kê hoạt động của người dùng
 const getUserActivityStats = async (req, res, next) => {
     try {
         const workspaceId = req.workspaceId;
@@ -162,7 +162,7 @@ const getUserActivityStats = async (req, res, next) => {
         let params = [];
         
         if (workspaceId) {
-            // Trong workspace context, lấy role từ workspace_members và filter theo workspace
+            // Trong context workspace, lấy role từ workspace_members và lọc theo workspace
             query = `
                 SELECT 
                     u.id,
@@ -183,7 +183,7 @@ const getUserActivityStats = async (req, res, next) => {
             `;
             params = [workspaceId, workspaceId];
         } else {
-            // Global context: không có role filter, lấy tất cả users
+            // Global (tổng): không filter role, lấy tất cả người dùng
             query = `
                 SELECT 
                     u.id,

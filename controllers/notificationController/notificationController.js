@@ -1,6 +1,6 @@
 const Notification = require('../../models/notificationModel/Notification');
 
-// Get user's notifications
+// Lấy danh sách thông báo của người dùng
 const getMyNotifications = async (req, res, next) => {
     try {
         const user_id = req.user.id;
@@ -11,7 +11,7 @@ const getMyNotifications = async (req, res, next) => {
             limit: limit ? parseInt(limit) : 50
         });
         
-        // Convert notifications to JSON format
+        // Chuyển thông báo sang dạng JSON
         const notificationsData = notifications.map(notif => notif.toJSON());
         
         res.json({ success: true, data: notificationsData });
@@ -20,7 +20,7 @@ const getMyNotifications = async (req, res, next) => {
     }
 };
 
-// Get unread count
+// Lấy số lượng thông báo chưa đọc
 const getUnreadCount = async (req, res, next) => {
     try {
         const user_id = req.user.id;
@@ -31,7 +31,7 @@ const getUnreadCount = async (req, res, next) => {
     }
 };
 
-// Mark notification as read
+// Đánh dấu một thông báo là đã đọc
 const markAsRead = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -53,7 +53,7 @@ const markAsRead = async (req, res, next) => {
     }
 };
 
-// Mark all as read
+// Đánh dấu tất cả thông báo là đã đọc
 const markAllAsRead = async (req, res, next) => {
     try {
         const user_id = req.user.id;
@@ -64,7 +64,7 @@ const markAllAsRead = async (req, res, next) => {
     }
 };
 
-// Delete notification
+// Xóa thông báo
 const deleteNotification = async (req, res, next) => {
     try {
         const { id } = req.params;

@@ -26,7 +26,17 @@ class User {
         this.created_at = data.created_at;
     }
 
-    // Tạo user mới
+    // ================= Tóm tắt các phương thức xử lý User =================
+    // - create: Tạo user mới, kiểm tra trùng email, mã hóa mật khẩu trước khi lưu vào CSDL.
+    // - findByEmail: Tìm user theo email.
+    // - findById: Tìm user theo ID.
+    // - validatePassword: Kiểm tra mật khẩu hợp lệ.
+    // - toJSON: Trả về thông tin user (ẩn password).
+    // - update: Cập nhật thông tin user (chỉ trường hợp cho phép), tự động cập nhật avatar, kiểm soát log debug ở môi trường phát triển.
+    // - delete: Xóa user khỏi hệ thống.
+    // - findAll: Lấy danh sách tất cả user, sắp xếp theo thời gian tạo mới nhất trước.
+    // ======================================================================
+
     static async create(userData) {
         try {
             const { username, email, password, phone, role = 'user' } = userData;

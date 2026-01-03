@@ -18,8 +18,6 @@ const getAll = async (req, res, next) => {
         const currentRole = req.workspaceRole || currentUser.role;
 
         // Kiểm tra quyền truy cập
-        // Admin, PM, Team Leader: có quyền xem
-        // Member: không có quyền (sẽ bị chặn ở middleware)
         if (!['ad', 'pm', 'tl'].includes(currentRole)) {
             return res.status(403).json({
                 success: false,
@@ -175,8 +173,6 @@ const create = async (req, res, next) => {
             });
         }
 
-        // Nếu có workspace context và tồn tại user trong hệ thống với email này,
-        // tự động thêm user đó vào workspace_members để khi đăng nhập sẽ thấy workspace.
         if (workspaceId) {
             try {
                 const existingUser = await User.findByEmail(email.trim());
@@ -389,8 +385,7 @@ const remove = async (req, res, next) => {
     }
 };
 
-// Tìm kiếm email theo pattern (cho autocomplete)
-// Trả về member info kèm user_id nếu tìm thấy user tương ứng trong bảng users
+// Tìm kiếm email theo pattern
 const searchEmails = async (req, res, next) => {
     try {
         const query = req.query.q || '';
@@ -425,8 +420,8 @@ const searchEmails = async (req, res, next) => {
 
             if (user) {
                 return {
-                    id: user.id,               // user_id dùng cho project members
-                    member_id: member.id,      // giữ lại member_id để tham chiếu
+                    id: user.id,
+                    member_id: member.id,
                     name: member.name,
                     username: user.username,
                     email: member.email

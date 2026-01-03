@@ -12,6 +12,7 @@ const normalizeProgress = (value) => {
     return Math.max(0, Math.min(100, parsed));
 };
 
+// Chuẩn hóa trạng thái dựa vào các giá trị hợp lệ trong DB
 const normalizeStatus = async (status) => {
     if (!status) return DEFAULT_STATUS;
     const statuses = await Task.getStatusOptions();
@@ -19,6 +20,7 @@ const normalizeStatus = async (status) => {
     return statuses.includes(status) ? status : DEFAULT_STATUS;
 };
 
+// Lấy danh sách task theo project
 const listByProject = async (req, res, next) => {
     try {
         const { projectId } = req.params;
@@ -29,7 +31,7 @@ const listByProject = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy dự án' });
         }
         
-        // Nếu project có workspace_id và user đang trong workspace context
+        // Nếu project có workspace_id và user đang ở workspace context
         if (project.workspace_id && req.workspaceId) {
             if (project.workspace_id !== req.workspaceId) {
                 return res.status(403).json({
@@ -46,6 +48,7 @@ const listByProject = async (req, res, next) => {
     }
 };
 
+// Tạo task mới
 const create = async (req, res, next) => {
     try {
         const { project_id, name, description, status, progress, due_date } = req.body;
@@ -57,7 +60,7 @@ const create = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy dự án' });
         }
         
-        // Nếu project có workspace_id và user đang trong workspace context
+        // Nếu project có workspace_id và user đang ở workspace context
         if (project.workspace_id && req.workspaceId) {
             if (project.workspace_id !== req.workspaceId) {
                 return res.status(403).json({
@@ -71,7 +74,7 @@ const create = async (req, res, next) => {
         const normalizedStatus = await normalizeStatus(status);
         const task = await Task.create({ project_id, name, description, status: normalizedStatus, progress: normalizedProgress, due_date });
         
-        // Tạo thông báo cho tất cả members của project (trừ người tạo task)
+        // Tạo thông báo cho tất cả thành viên của project (trừ người tạo task)
         try {
             // Lấy thông tin project
             const project = await Project.findById(project_id);
@@ -79,7 +82,7 @@ const create = async (req, res, next) => {
                 throw new Error('Project not found');
             }
             
-            // Lấy danh sách members của project
+            // Lấy danh sách thành viên của project
             const [membersList] = await db.execute(`
                 SELECT pm.user_id, u.username
                 FROM prj_mb pm
@@ -114,14 +117,14 @@ const create = async (req, res, next) => {
                 }
             }
             
-            // Tạo notifications hàng loạt
+            // Đẩy thông báo hàng loạt
             if (notifications.length > 0) {
                 await Notification.createMultiple(notifications);
             }
         } catch (notifError) {
-            // Log error nhưng không làm fail request
+            // Ghi log lỗi nhưng không làm thất bại request tạo task
             if (process.env.NODE_ENV === 'development') {
-                console.error('Error creating notifications for task:', notifError);
+                console.error('Lỗi khi tạo notification cho task:', notifError);
             }
         }
         
@@ -131,6 +134,7 @@ const create = async (req, res, next) => {
     }
 };
 
+// Lấy task theo ID
 const getById = async (req, res, next) => {
     try {
         const task = await Task.findById(req.params.id);
@@ -153,6 +157,7 @@ const getById = async (req, res, next) => {
     }
 };
 
+// Cập nhật thông tin task (chung)
 const update = async (req, res, next) => {
     try {
         const task = await Task.findById(req.params.id);
@@ -176,6 +181,7 @@ const update = async (req, res, next) => {
     }
 };
 
+// Lấy danh sách trạng thái hợp lệ của task
 const getStatuses = async (req, res, next) => {
     try {
         const statuses = await Task.getStatusOptions();
@@ -185,6 +191,7 @@ const getStatuses = async (req, res, next) => {
     }
 };
 
+// Chỉ cập nhật tiến độ task
 const updateProgress = async (req, res, next) => {
     try {
         const { progress } = req.body;
@@ -212,10 +219,8 @@ const updateProgress = async (req, res, next) => {
             }
         }
         
-        // Check permission: PM (trong workspace hoặc global) và Admin có thể sửa progress của mọi task
-        // TL, MB chỉ có thể sửa progress của task được assign cho họ
         if (currentRole !== 'ad' && currentRole !== 'pm') {
-            // Check if user is assigned to this task
+            // Kiểm tra user có được giao task này không
             const [assignments] = await db.execute(
                 'SELECT * FROM tsk_asg WHERE task_id = ? AND user_id = ?',
                 [task.id, userId]
@@ -229,7 +234,7 @@ const updateProgress = async (req, res, next) => {
             }
         }
         
-        // Chỉ update progress
+        // Chỉ cập nhật progress
         await task.update({ progress });
         const updatedTask = await Task.findById(req.params.id);
         res.json({ success: true, data: updatedTask });
@@ -238,7 +243,7 @@ const updateProgress = async (req, res, next) => {
     }
 };
 
-// Cập nhật trạng thái task với quyền tương tự updateProgress
+// Cập nhật trạng thái task với quyền kiểm tra như updateProgress
 const updateStatus = async (req, res, next) => {
     try {
         const { status } = req.body;
@@ -265,9 +270,8 @@ const updateStatus = async (req, res, next) => {
             }
         }
 
-        // PM (trong workspace hoặc global) và Admin có thể cập nhật trạng thái của mọi task
-        // TL, MB chỉ được phép cập nhật nếu là người được giao task
         if (currentRole !== 'ad' && currentRole !== 'pm') {
+            // Kiểm tra user có được giao task không
             const [assignments] = await db.execute(
                 'SELECT * FROM tsk_asg WHERE task_id = ? AND user_id = ?',
                 [task.id, userId]
@@ -292,6 +296,7 @@ const updateStatus = async (req, res, next) => {
     }
 };
 
+// Xóa task
 const remove = async (req, res, next) => {
     try {
         const task = await Task.findById(req.params.id);

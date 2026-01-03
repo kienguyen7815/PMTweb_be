@@ -1,6 +1,6 @@
 const ProjectComment = require('../../models/projectCommentModel/ProjectComment');
 
-// Get comments for a project
+// Lấy danh sách bình luận của một dự án
 const getProjectComments = async (req, res, next) => {
     try {
         const { projectId } = req.params;
@@ -11,7 +11,7 @@ const getProjectComments = async (req, res, next) => {
     }
 };
 
-// Create a comment
+// Tạo bình luận cho dự án
 const createComment = async (req, res, next) => {
     try {
         const { project_id, comment } = req.body;
@@ -33,7 +33,7 @@ const createComment = async (req, res, next) => {
     }
 };
 
-// Update a comment
+// Cập nhật bình luận dự án
 const updateComment = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -45,8 +45,6 @@ const updateComment = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy comment' });
         }
 
-        // Only the comment owner or admin can update
-        // Admin chỉ áp dụng ở global scope (không có workspace context)
         const currentRole = req.workspaceRole || req.user.role;
         const isAdmin = !req.workspaceRole && req.user.role === 'ad';
         if (commentObj.user_id !== user_id && !isAdmin) {
@@ -62,7 +60,7 @@ const updateComment = async (req, res, next) => {
     }
 };
 
-// Delete a comment
+// Xóa bình luận dự án
 const deleteComment = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -73,8 +71,6 @@ const deleteComment = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy comment' });
         }
 
-        // Only the comment owner or admin can delete
-        // Admin chỉ áp dụng ở global scope (không có workspace context)
         const currentRole = req.workspaceRole || req.user.role;
         const isAdmin = !req.workspaceRole && req.user.role === 'ad';
         if (commentObj.user_id !== user_id && !isAdmin) {

@@ -9,6 +9,14 @@ class ProjectComment {
         this.created_at = data.created_at;
     }
 
+    /**
+     * Tạo mới bình luận cho 1 project
+     * @param {Object} param0 - Thông tin bình luận
+     * @param {number} param0.project_id - ID của project
+     * @param {number} param0.user_id - ID người bình luận
+     * @param {string} param0.comment - Nội dung bình luận
+     * @returns {Promise<Object>} - Bình luận vừa tạo (bao gồm thông tin user, project)
+     */
     static async create({ project_id, user_id, comment }) {
         try {
             if (!project_id || !user_id || !comment || !comment.trim()) {
@@ -23,6 +31,11 @@ class ProjectComment {
         }
     }
 
+    /**
+     * Lấy thông tin chi tiết bình luận theo ID
+     * @param {number} id - ID comment
+     * @returns {Promise<Object|null>} - Dữ liệu bình luận, hoặc null nếu không tồn tại
+     */
     static async findById(id) {
         try {
             const query = `
@@ -42,6 +55,11 @@ class ProjectComment {
         }
     }
 
+    /**
+     * Lấy danh sách bình luận theo project_id
+     * @param {number} project_id - ID project
+     * @returns {Promise<Array>} - Danh sách bình luận trong project (bao gồm thông tin user)
+     */
     static async findByProjectId(project_id) {
         try {
             const query = `
@@ -59,6 +77,11 @@ class ProjectComment {
         }
     }
 
+    /**
+     * Cập nhật bình luận (chỉ hỗ trợ cập nhật nội dung comment)
+     * @param {Object} updateData - Dữ liệu cập nhật
+     * @returns {Promise<Object>} - Bình luận sau khi được cập nhật
+     */
     async update(updateData) {
         try {
             const allowed = ['comment'];
@@ -83,6 +106,10 @@ class ProjectComment {
         }
     }
 
+    /**
+     * Xóa bình luận khỏi project
+     * @returns {Promise<boolean>} - true nếu thành công
+     */
     async delete() {
         try {
             const query = 'DELETE FROM prj_cmt WHERE id = ?';

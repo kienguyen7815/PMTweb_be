@@ -17,10 +17,8 @@ const db = mysql.createPool({
     connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT || '10000', 10)
 });
 
-// Kiểm tra kết nối database khi khởi động ứng dụng
 db.getConnection()
     .then(connection => {
-        // Set charset UTF8MB4 cho connection
         connection.query('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci');
         console.log('Database connected successfully');
         connection.release();

@@ -5,11 +5,17 @@ class Notification {
         this.id = data.id;
         this.user_id = data.user_id;
         this.message = data.message;
-        // MySQL BOOLEAN returns 0/1, convert to boolean
         this.is_read = data.is_read === 1 || data.is_read === true;
         this.created_at = data.created_at;
     }
 
+    /**
+     * Tạo notification mới cho user
+     * @param {Object} param0 - Thông tin notification
+     * @param {number} param0.user_id - ID người nhận
+     * @param {string} param0.message - Nội dung notification
+     * @returns {Promise<Notification>} - Notification vừa tạo
+     */
     static async create({ user_id, message }) {
         try {
             if (!user_id || !message || !message.trim()) {
@@ -24,6 +30,11 @@ class Notification {
         }
     }
 
+    /**
+     * Tạo nhiều notification 1 lúc cho nhiều user
+     * @param {Array<{user_id: number, message: string}>} notifications - Danh sách thông báo
+     * @returns {Promise<Notification[]>}
+     */
     static async createMultiple(notifications) {
         try {
             if (!Array.isArray(notifications) || notifications.length === 0) {
@@ -37,7 +48,6 @@ class Notification {
             const query = `INSERT INTO ntf (user_id, message) VALUES ${placeholders}`;
             const [result] = await db.execute(query, flatValues);
 
-            // Lấy lại tất cả notification vừa tạo trong một query để tránh N+1
             const firstId = result.insertId;
             const lastId = firstId + notifications.length - 1;
 
@@ -52,6 +62,11 @@ class Notification {
         }
     }
 
+    /**
+     * Lấy notification theo id
+     * @param {number} id
+     * @returns {Promise<Notification|null>}
+     */
     static async findById(id) {
         try {
             const query = 'SELECT * FROM ntf WHERE id = ?';
@@ -63,6 +78,14 @@ class Notification {
         }
     }
 
+    /**
+     * Lấy danh sách notification theo user_id
+     * @param {number} user_id
+     * @param {Object} options
+     * @param {number} [options.limit=50] - Số lượng tối đa trả về
+     * @param {boolean} [options.unreadOnly=false] - Chỉ lấy những thông báo chưa đọc
+     * @returns {Promise<Notification[]>}
+     */
     static async findByUserId(user_id, options = {}) {
         try {
             const { limit = 50, unreadOnly = false } = options;
@@ -75,14 +98,11 @@ class Notification {
 
             query += ' ORDER BY created_at DESC';
 
-            // MySQL doesn't support placeholder for LIMIT, so we need to validate and use string interpolation
-            // Validate limit is a positive integer to prevent SQL injection
             if (limit) {
                 const limitNum = parseInt(limit, 10);
                 if (isNaN(limitNum) || limitNum < 1) {
                     throw new Error('Limit must be a positive integer');
                 }
-                // Use string interpolation for LIMIT after validation
                 query += ` LIMIT ${limitNum}`;
             }
 
@@ -93,6 +113,11 @@ class Notification {
         }
     }
 
+    /**
+     * Đếm số lượng notification chưa đọc của user
+     * @param {number} user_id
+     * @returns {Promise<number>}
+     */
     static async countUnread(user_id) {
         try {
             const query = 'SELECT COUNT(*) as count FROM ntf WHERE user_id = ? AND is_read = FALSE';
@@ -103,6 +128,10 @@ class Notification {
         }
     }
 
+    /**
+     * Đánh dấu đã đọc notification này
+     * @returns {Promise<Notification>}
+     */
     async markAsRead() {
         try {
             const query = 'UPDATE ntf SET is_read = TRUE WHERE id = ?';
@@ -114,6 +143,11 @@ class Notification {
         }
     }
 
+    /**
+     * Đánh dấu tất cả notification của user là đã đọc
+     * @param {number} user_id
+     * @returns {Promise<boolean>}
+     */
     static async markAllAsRead(user_id) {
         try {
             const query = 'UPDATE ntf SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE';
@@ -124,6 +158,10 @@ class Notification {
         }
     }
 
+    /**
+     * Xóa notification này
+     * @returns {Promise<boolean>}
+     */
     async delete() {
         try {
             const query = 'DELETE FROM ntf WHERE id = ?';
@@ -134,7 +172,10 @@ class Notification {
         }
     }
 
-    // Lấy thông tin notification dạng JSON (để serialize)
+    /**
+     * Chuyển đối tượng Notification về dạng JSON
+     * @returns {Object}
+     */
     toJSON() {
         return {
             id: this.id,
