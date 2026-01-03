@@ -8,9 +8,15 @@ class TaskAssignment {
         this.assigned_at = data.assigned_at;
     }
 
+    /**
+     * Gán task cho user mới, kiểm tra để tránh trùng lặp.
+     * @param {Object} param0
+     * @param {number} param0.task_id - Id của task
+     * @param {number} param0.user_id - Id của user
+     * @returns {Promise<Object>} - Thông tin task assignment vừa tạo
+     */
     static async create({ task_id, user_id }) {
         try {
-            // Check if assignment already exists
             const existing = await this.findByTaskAndUser(task_id, user_id);
             if (existing) {
                 throw new Error('Task đã được giao cho user này');
@@ -24,6 +30,11 @@ class TaskAssignment {
         }
     }
 
+    /**
+     * Tìm assignment theo id (bao gồm thông tin task, user)
+     * @param {number} id
+     * @returns {Promise<Object|null>}
+     */
     static async findById(id) {
         try {
             const query = `
@@ -45,6 +56,12 @@ class TaskAssignment {
         }
     }
 
+    /**
+     * Tìm assignment theo task_id và user_id
+     * @param {number} task_id 
+     * @param {number} user_id 
+     * @returns {Promise<TaskAssignment|null>}
+     */
     static async findByTaskAndUser(task_id, user_id) {
         try {
             const query = 'SELECT * FROM tsk_asg WHERE task_id = ? AND user_id = ?';
@@ -56,6 +73,11 @@ class TaskAssignment {
         }
     }
 
+    /**
+     * Lấy danh sách task được giao cho user_id cụ thể (gồm thông tin task/project)
+     * @param {number} user_id
+     * @returns {Promise<Array>}
+     */
     static async findByUserId(user_id) {
         try {
             const query = `
@@ -79,6 +101,11 @@ class TaskAssignment {
         }
     }
 
+    /**
+     * Lấy danh sách user được giao task cụ thể (gồm thông tin user)
+     * @param {number} task_id
+     * @returns {Promise<Array>}
+     */
     static async findByTaskId(task_id) {
         try {
             const query = `
@@ -96,6 +123,10 @@ class TaskAssignment {
         }
     }
 
+    /**
+     * Xóa assignment bởi chính instance (theo id)
+     * @returns {Promise<boolean>}
+     */
     async delete() {
         try {
             const query = 'DELETE FROM tsk_asg WHERE id = ?';
@@ -106,6 +137,12 @@ class TaskAssignment {
         }
     }
 
+    /**
+     * Xóa assignment theo task_id và user_id
+     * @param {number} task_id 
+     * @param {number} user_id 
+     * @returns {Promise<boolean>}
+     */
     static async deleteByTaskAndUser(task_id, user_id) {
         try {
             const query = 'DELETE FROM tsk_asg WHERE task_id = ? AND user_id = ?';

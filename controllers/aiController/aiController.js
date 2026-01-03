@@ -1,89 +1,82 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-// CONSTANTS & CONFIGS 
+// system instruction cho chat AI, phục vụ hướng dẫn cách trả lời, format, và phong cách
 const SYSTEM_INSTRUCTION = `Bạn là một trợ lý AI thân thiện, giống như một người bạn đồng nghiệp trong lĩnh vực công nghệ và quản lý dự án.
+	CÁCH TRÒ CHUYỆN:
+		- Trò chuyện tự nhiên, thân thiện, không cứng nhắc
+		- Trả lời bằng văn bản thuần túy, KHÔNG dùng markdown (**bold**, *italic*, ##heading, etc.)
+		- Hỏi lại khi cần thêm thông tin, giống như đang trò chuyện với bạn bè
+		- Không bắt buộc phải đề xuất tasks cho mọi câu hỏi
+	KHI NGƯỜI DÙNG HỎI VỀ DỰ ÁN:
+		- Hỏi thêm về lĩnh vực, mục đích của dự án
+		- Gợi ý công nghệ, kiến trúc phù hợp nếu cần
+		- Khi người dùng muốn bắt đầu làm việc cụ thể, gợi ý các bước SDLC:
+		+ Requirement Analysis (Phân tích yêu cầu)
+		+ Design (Thiết kế hệ thống)
+		+ Implementation (Lập trình)
+		+ Testing (Kiểm thử)
+		+ Deployment (Triển khai)
+		+ Maintenance (Bảo trì)
+	KHI GỢI Ý TASKS CHI TIẾT:
+		- Liệt kê từng task với format: "1. Tên task: Mô tả ngắn gọn"
+		- Nhóm theo giai đoạn SDLC
+		- Ví dụ:
+			Requirement Analysis:
+			1. Thu thập yêu cầu: Phỏng vấn người dùng, liệt kê chức năng cần có
+			2. Viết tài liệu SRS: Tạo tài liệu mô tả yêu cầu chi tiết
+			Design:
+			3. Thiết kế Database: Vẽ ERD, xác định các bảng và quan hệ
+			4. Thiết kế UI/UX: Vẽ wireframe, mockup cho giao diện
+	LỆNH ĐẶC BIỆT:
+	- Khi người dùng gõ "/export", trả về danh sách tasks dạng JSON với format:
+	{
+		"Requirement Analysis": ["Task 1", "Task 2", "Task 3"],
+		"Design": ["Task 4", "Task 5"],
+		"Implementation": ["Task 6", "Task 7", "Task 8"],
+		"Testing": ["Task 9", "Task 10"],
+		"Deployment": ["Task 11", "Task 12"],
+		"Maintenance": ["Task 13", "Task 14"]
+	}
+	VÍ DỤ TRÒ CHUYỆN:
+		User: "Tôi muốn tạo project mới"
+		AI: "Tuyệt! Bạn định làm project về lĩnh vực gì?"
+		User: "Hệ thống quản lý đơn hàng"
+		AI: "Hay quá! Với hệ thống quản lý đơn hàng, bạn cần những chức năng chính như: tạo đơn, theo dõi trạng thái, quản lý khách hàng, báo cáo... Bạn muốn tôi gợi ý các bước phát triển theo SDLC không?"
+		User: "Có"
+		AI: "Ok! Đây là các bước cơ bản:
+			- Requirement Analysis: Thu thập yêu cầu, liệt kê chức năng
+			- Design: Vẽ sơ đồ ER, thiết kế UI/UX
+			- Implementation: Lập trình backend & frontend
+			- Testing: Viết testcase, kiểm thử
+			- Deployment: Triển khai lên server
+			- Maintenance: Theo dõi bug, nâng cấp
+		Bạn muốn tôi chi tiết tasks cho từng bước không?"
+	LƯU Ý:
+	- Giữ phong cách trò chuyện tự nhiên, không quá kỹ thuật
+	- Chỉ đi sâu vào chi tiết khi người dùng yêu cầu
+	- Có thể hỏi ngắn gọn, không cần câu dài`;
 
-CÁCH TRÒ CHUYỆN:
-- Trò chuyện tự nhiên, thân thiện, không cứng nhắc
-- Trả lời bằng văn bản thuần túy, KHÔNG dùng markdown (**bold**, *italic*, ##heading, etc.)
-- Hỏi lại khi cần thêm thông tin, giống như đang trò chuyện với bạn bè
-- Không bắt buộc phải đề xuất tasks cho mọi câu hỏi
-
-KHI NGƯỜI DÙNG HỎI VỀ DỰ ÁN:
-- Hỏi thêm về lĩnh vực, mục đích của dự án
-- Gợi ý công nghệ, kiến trúc phù hợp nếu cần
-- Khi người dùng muốn bắt đầu làm việc cụ thể, gợi ý các bước SDLC:
-  + Requirement Analysis (Phân tích yêu cầu)
-  + Design (Thiết kế hệ thống)
-  + Implementation (Lập trình)
-  + Testing (Kiểm thử)
-  + Deployment (Triển khai)
-  + Maintenance (Bảo trì)
-
-KHI GỢI Ý TASKS CHI TIẾT:
-- Liệt kê từng task với format: "1. Tên task: Mô tả ngắn gọn"
-- Nhóm theo giai đoạn SDLC
-- Ví dụ:
-  Requirement Analysis:
-  1. Thu thập yêu cầu: Phỏng vấn người dùng, liệt kê chức năng cần có
-  2. Viết tài liệu SRS: Tạo tài liệu mô tả yêu cầu chi tiết
-  
-  Design:
-  3. Thiết kế Database: Vẽ ERD, xác định các bảng và quan hệ
-  4. Thiết kế UI/UX: Vẽ wireframe, mockup cho giao diện
-
-LỆNH ĐẶC BIỆT:
-- Khi người dùng gõ "/export", trả về danh sách tasks dạng JSON với format:
-  {
-    "Requirement Analysis": ["Task 1", "Task 2", "Task 3"],
-    "Design": ["Task 4", "Task 5"],
-    "Implementation": ["Task 6", "Task 7", "Task 8"],
-    "Testing": ["Task 9", "Task 10"],
-    "Deployment": ["Task 11", "Task 12"],
-    "Maintenance": ["Task 13", "Task 14"]
-  }
-
-VÍ DỤ TRÒ CHUYỆN:
-User: "Tôi muốn tạo project mới"
-AI: "Tuyệt! Bạn định làm project về lĩnh vực gì?"
-
-User: "Hệ thống quản lý đơn hàng"
-AI: "Hay quá! Với hệ thống quản lý đơn hàng, bạn cần những chức năng chính như: tạo đơn, theo dõi trạng thái, quản lý khách hàng, báo cáo... Bạn muốn tôi gợi ý các bước phát triển theo SDLC không?"
-
-User: "Có"
-AI: "Ok! Đây là các bước cơ bản:
-- Requirement Analysis: Thu thập yêu cầu, liệt kê chức năng
-- Design: Vẽ sơ đồ ER, thiết kế UI/UX
-- Implementation: Lập trình backend & frontend
-- Testing: Viết testcase, kiểm thử
-- Deployment: Triển khai lên server
-- Maintenance: Theo dõi bug, nâng cấp
-Bạn muốn tôi chi tiết tasks cho từng bước không?"
-
-LƯU Ý:
-- Giữ phong cách trò chuyện tự nhiên, không quá kỹ thuật
-- Chỉ đi sâu vào chi tiết khi người dùng yêu cầu
-- Có thể hỏi ngắn gọn, không cần câu dài`;
-
+// Định nghĩa các phase của quy trình SDLC (dùng cho AI sinh tasks)
 const SDLC_PHASES = {
-  "Requirement Analysis":
-    "Thu thập và phân tích yêu cầu - Hiểu bài toán, xác định phạm vi, viết SRS, use case, user story",
-  "System & Technical Design":
-    "Thiết kế hệ thống - Kiến trúc, database, API, UI/UX, lựa chọn công nghệ",
-  "Development":
-    "Phát triển - Lập trình backend, frontend, tích hợp hệ thống, code review",
-  "Testing & Quality Assurance":
-    "Đảm bảo chất lượng - Unit test, integration test, UAT, kiểm tra hiệu năng và bảo mật",
-  "Deployment & Release":
-    "Triển khai - Build, CI/CD, cấu hình môi trường, phát hành sản phẩm",
-  "Maintenance & Improvement":
-    "Vận hành & cải tiến - Fix bug, theo dõi hệ thống, tối ưu và nâng cấp tính năng",
+	"Requirement Analysis":
+		"Thu thập và phân tích yêu cầu - Hiểu bài toán, xác định phạm vi, viết SRS, use case, user story",
+	"System & Technical Design":
+		"Thiết kế hệ thống - Kiến trúc, database, API, UI/UX, lựa chọn công nghệ",
+	"Development":
+		"Phát triển - Lập trình backend, frontend, tích hợp hệ thống, code review",
+	"Testing & Quality Assurance":
+		"Đảm bảo chất lượng - Unit test, integration test, UAT, kiểm tra hiệu năng và bảo mật",
+	"Deployment & Release":
+		"Triển khai - Build, CI/CD, cấu hình môi trường, phát hành sản phẩm",
+	"Maintenance & Improvement":
+		"Vận hành & cải tiến - Fix bug, theo dõi hệ thống, tối ưu và nâng cấp tính năng",
 };
 
-
+// Danh sách phase chuẩn dùng để validate
 const VALID_PHASES = Object.keys(SDLC_PHASES);
 
+// Template mẫu JSON array tasks gửi cho AI để format đúng mong muốn
 const JSON_TEMPLATE = `[
   {
     "name": "Tên task ngắn gọn",
@@ -92,7 +85,9 @@ const JSON_TEMPLATE = `[
   }
 ]`;
 
-// HELPER FUNCTIONS 
+// ================== HELPER FUNCTIONS ==================
+
+// Hàm loại bỏ định dạng Markdown trong text trả về từ AI
 const removeMarkdown = (text) => {
 	if (!text) return text;
 	let cleaned = text
@@ -109,7 +104,7 @@ const removeMarkdown = (text) => {
 	return cleaned.trim();
 };
 
-// Hàm cắt description không phá vỡ câu
+// Giới hạn độ dài mô tả task nhưng không cắt giữa câu/cụm
 const truncateDescription = (text, maxLength = 1000) => {
 	if (!text || text.length <= maxLength) return text;
 	let truncated = text.substring(0, maxLength);
@@ -124,12 +119,12 @@ const truncateDescription = (text, maxLength = 1000) => {
 	return truncated.trim() + "...";
 };
 
-// Hàm validate phase
+// Kiểm tra phase có thuộc danh sách hợp lệ hay không
 const isValidPhase = (phase) => {
 	return VALID_PHASES.includes(phase);
 };
 
-// Các hàm helper đơn giản
+// Hàm nhận biết input quá mơ hồ từ user (câu hỏi trống/bị bỏ qua)
 const detectAmbiguousInput = (message) => {
 	if (!message || message.trim().length === 0) {
 		return {
@@ -140,7 +135,7 @@ const detectAmbiguousInput = (message) => {
 	return { isAmbiguous: false };
 };
 
-// Hàm parse tasks từ AI response
+// Parse tasks từ text trả về của AI (dạng liệt kê/phân theo phase)
 const parseTasksFromResponse = (aiResponse) => {
 	if (!aiResponse) return [];
 
@@ -149,6 +144,7 @@ const parseTasksFromResponse = (aiResponse) => {
 	let currentPhase = null;
 	let currentSection = null;
 
+	// Regex nhận diện tiêu đề giai đoạn/section/task
 	const phasePattern =
 		/^(?:Giai đoạn\s*\d+|Phase\s*\d+)[\s:]*(.+?)(?:\s*-\s*(.+))?$/i;
 	const sectionPattern =
@@ -156,6 +152,7 @@ const parseTasksFromResponse = (aiResponse) => {
 	const taskPattern = /^(\d+)[\.\)]\s*(.+?)[\s:：-]+(.+)$/;
 	const simpleTaskPattern = /^(\d+)[\.\)]\s*(.+)$/;
 
+	// Duyệt từng dòng và parse phase/task
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i].trim();
 		if (!line) continue;
@@ -217,13 +214,13 @@ const parseTasksFromResponse = (aiResponse) => {
 	return tasks;
 };
 
-// Hàm map text sang SDLC phase chuẩn
+// Map string text sang tên phase SDLC chuẩn (kể cả tiếng Anh/Việt)
 const mapToSDLCPhase = (text) => {
 	if (!text) return null;
 
 	const normalized = text.toLowerCase().trim();
 
-	// Mapping rules
+	// Quy tắc mapping từ từ khoá sang phase chuẩn
 	const phaseMap = {
 	  requirement: "Requirement Analysis",
 	  "yêu cầu": "Requirement Analysis",
@@ -254,8 +251,7 @@ const mapToSDLCPhase = (text) => {
 	  maintain: "Maintenance & Improvement",
 	  improvement: "Maintenance & Improvement",
 	  "bảo trì": "Maintenance & Improvement",
-};
-
+	};
 
 	for (const [key, phase] of Object.entries(phaseMap)) {
 		if (normalized.includes(key)) {
@@ -266,7 +262,7 @@ const mapToSDLCPhase = (text) => {
 	return null;
 };
 
-// Hàm phân loại loại response và parse tasks
+// Hàm phân loại loại nội dung trả về: danh sách task hay chỉ là trình bày chung/info
 const analyzeResponse = (aiResponse, userMessage) => {
 	if (!aiResponse) {
 		return { type: "info", tasks: [] };
@@ -316,6 +312,7 @@ const analyzeResponse = (aiResponse, userMessage) => {
 };
 
 
+// Chuẩn hoá lịch sử tin nhắn thành format chat Gemini yêu cầu
 const normalizeHistory = (messages) => {
 	if (!messages || messages.length === 0) return [];
 
@@ -342,7 +339,9 @@ const normalizeHistory = (messages) => {
 	return history;
 };
 
-//  MAIN HANDLERS
+// ================== MAIN HANDLERS (Xử lý endpoints chính) ==================
+
+// Xử lý hội thoại AI và trả lời cho người dùng (gửi/nhận messages)
 const chatWithAI = async (req, res, next) => {
 	try {
 		const { messages, project_name, user_projects } = req.body;
@@ -353,11 +352,13 @@ const chatWithAI = async (req, res, next) => {
 			});
 		}
 
-		const model = genAI.getGenerativeModel({
-			model: "gemini-2.5-flash-lite", 
+		const genAIInstance = getGenAI();
+		const model = genAIInstance.getGenerativeModel({
+			model: "gemini-1.5-flash", 
 		});
 
 		let conversationHistory = messages || [];
+		// Nếu chưa có lịch sử chat, trả lời chào đầu tiên (Greeting)
 		if (conversationHistory.length === 0) {
 			let greeting =
 				"Xin chào! Tôi là trợ lý AI của bạn. Tôi có thể giúp bạn lập kế hoạch và quản lý dự án. Bạn muốn làm gì hôm nay?";
@@ -383,6 +384,7 @@ const chatWithAI = async (req, res, next) => {
 
 		const lastMessage = conversationHistory[conversationHistory.length - 1];
 
+		// Tin nhắn cuối phải là từ người dùng
 		if (lastMessage.role !== "user") {
 			return res.status(400).json({
 				success: false,
@@ -391,6 +393,7 @@ const chatWithAI = async (req, res, next) => {
 		}
 
 		const userMessage = lastMessage.content.trim();
+		// Lệnh /export: trả về JSON mẫu các task SDLC
 		if (userMessage.toLowerCase().startsWith("/export")) {
 			let projectContext = "";
 			for (let i = conversationHistory.length - 1; i >= 0; i--) {
@@ -406,6 +409,7 @@ const chatWithAI = async (req, res, next) => {
 				}
 			}
 
+			// JSON SDLC mẫu theo từng phase
 			const tasksJSON = {
 				"Requirement Analysis": [
 					"Thu thập yêu cầu từ stakeholders",
@@ -523,6 +527,7 @@ const chatWithAI = async (req, res, next) => {
 	}
 };
 
+// Tạo gợi ý danh sách task phù hợp cho dự án dựa trên context gửi lên
 const generateTaskSuggestions = async (req, res, next) => {
 	try {
 		const { project_name, project_context } = req.body;
@@ -540,12 +545,14 @@ const generateTaskSuggestions = async (req, res, next) => {
 			});
 		}
 
-		const model = genAI.getGenerativeModel({
-			model: "gemini-2.5-flash-lite", 
+		const genAIInstance = getGenAI();
+		const model = genAIInstance.getGenerativeModel({
+			model: "gemini-1.5-flash", 
 		});
 
 		let projectInfo = `Tên dự án: ${project_name.trim()}`;
 
+		// Thêm các trường context nếu có bổ sung
 		if (project_context) {
 			if (project_context.description) {
 				projectInfo += `\nMô tả: ${project_context.description}`;
@@ -561,6 +568,7 @@ const generateTaskSuggestions = async (req, res, next) => {
 			}
 		}
 
+		// Prompt chi tiết gửi cho AI
 		const prompt = `Dựa trên quy trình SDLC (Software Development Life Cycle) chuẩn với 6 giai đoạn, hãy đề xuất danh sách các task cần quản lý cho dự án sau:
 			${projectInfo}
 			THÔNG TIN VỀ 6 GIAI ĐOẠN SDLC:
@@ -588,6 +596,7 @@ const generateTaskSuggestions = async (req, res, next) => {
 		let tasks = [];
 		let parseError = null;
 
+		// Try/catch parsing JSON trả về từ AI
 		try {
 			tasks = JSON.parse(text);
 		} catch (e1) {
@@ -610,6 +619,7 @@ const generateTaskSuggestions = async (req, res, next) => {
 			}
 		}
 
+		// Nếu không parse được, trả lỗi
 		if (parseError || !Array.isArray(tasks)) {
 			return res.status(500).json({
 				success: false,
@@ -619,6 +629,7 @@ const generateTaskSuggestions = async (req, res, next) => {
 			});
 		}
 
+		// Chuẩn hoá, lọc và giới hạn danh sách task phù hợp
 		const formattedTasks = tasks
 			.filter((task) => {
 				if (!task.name || !task.name.trim()) return false;
@@ -637,7 +648,7 @@ const generateTaskSuggestions = async (req, res, next) => {
 				phase: task.phase || "Implementation",
 			}));
 
-		// Kiểm tra số lượng tasks tối thiểu
+		// Kiểm tra số lượng task hợp lệ tối thiểu trước khi trả ra ngoài
 		if (formattedTasks.length === 0) {
 			return res.status(500).json({
 				success: false,

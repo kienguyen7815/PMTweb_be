@@ -4,37 +4,36 @@ const Workspace = require('../../models/workspaceModel/Workspace');
 const Project = require('../../models/projectModel/Project');
 
 
-// Get dashboard statistics
+// Lấy thống kê tổng quan dashboard
 const getDashboardStats = async (req, res, next) => {
     try {
-        // Total counts
         const [userCount] = await db.execute('SELECT COUNT(*) as count FROM users');
         const [workspaceCount] = await db.execute('SELECT COUNT(*) as count FROM workspaces');
         const [projectCount] = await db.execute('SELECT COUNT(*) as count FROM prj');
         const [taskCount] = await db.execute('SELECT COUNT(*) as count FROM tasks');
 
-        // Users by role
+        // Người dùng theo vai trò
         const [usersByRole] = await db.execute(`
             SELECT role, COUNT(*) as count 
             FROM users 
             GROUP BY role
         `);
 
-        // Projects by status
+        // Dự án theo trạng thái
         const [projectsByStatus] = await db.execute(`
             SELECT status, COUNT(*) as count 
             FROM prj 
             GROUP BY status
         `);
 
-        // Tasks by status
+        // Công việc theo trạng thái
         const [tasksByStatus] = await db.execute(`
             SELECT status, COUNT(*) as count 
             FROM tasks 
             GROUP BY status
         `);
 
-        // Recent activities (last 10)
+        // Hoạt động gần đây (10 hoạt động mới nhất)
         const [recentActivities] = await db.execute(`
             SELECT l.*, u.username, u.email
             FROM logs l
@@ -43,7 +42,7 @@ const getDashboardStats = async (req, res, next) => {
             LIMIT 10
         `);
 
-        // User growth (last 6 months)
+        // Tăng trưởng người dùng (6 tháng gần nhất)
         const [userGrowth] = await db.execute(`
             SELECT 
                 DATE_FORMAT(created_at, '%Y-%m') as month,
@@ -54,7 +53,7 @@ const getDashboardStats = async (req, res, next) => {
             ORDER BY month ASC
         `);
 
-        // Top active users (by task assignments)
+        // Người dùng hoạt động nhiều nhất (theo số lượng công việc được giao)
         const [topUsers] = await db.execute(`
             SELECT 
                 u.id,
@@ -73,6 +72,7 @@ const getDashboardStats = async (req, res, next) => {
         res.json({
             success: true,
             data: {
+                summary,
                 totals: {
                     users: userCount[0].count,
                     workspaces: workspaceCount[0].count,
@@ -92,9 +92,7 @@ const getDashboardStats = async (req, res, next) => {
     }
 };
 
-// ========== USER MANAGEMENT ==========
-
-// Get all users with detailed info
+// Lấy tất cả người dùng với thông tin chi tiết
 const getAllUsers = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -116,13 +114,13 @@ const getAllUsers = async (req, res, next) => {
             params.push(role);
         }
 
-        // Get total count
+        // Lấy tổng số lượng
         const [countResult] = await db.execute(
             `SELECT COUNT(*) as total FROM users ${whereClause}`,
             params
         );
 
-        // Get users with statistics
+        // Lấy danh sách người dùng kèm số liệu thống kê
         const [users] = await db.execute(`
             SELECT 
                 u.*,
@@ -163,7 +161,7 @@ const getAllUsers = async (req, res, next) => {
     }
 };
 
-// Get user detail with full statistics
+// Lấy chi tiết người dùng
 const getUserDetail = async (req, res, next) => {
     try {
         const userId = req.params.id;
@@ -176,7 +174,6 @@ const getUserDetail = async (req, res, next) => {
             });
         }
 
-        // Get workspaces
         const [workspaces] = await db.execute(`
             SELECT w.*, wm.role, wm.joined_at
             FROM workspaces w
@@ -185,7 +182,6 @@ const getUserDetail = async (req, res, next) => {
             ORDER BY wm.joined_at DESC
         `, [userId]);
 
-        // Get projects
         const [projects] = await db.execute(`
             SELECT p.*, pm.role, pm.joined_at
             FROM prj p
@@ -194,7 +190,6 @@ const getUserDetail = async (req, res, next) => {
             ORDER BY pm.joined_at DESC
         `, [userId]);
 
-        // Get tasks
         const [tasks] = await db.execute(`
             SELECT t.*, ta.assigned_at
             FROM tasks t
@@ -203,7 +198,6 @@ const getUserDetail = async (req, res, next) => {
             ORDER BY ta.assigned_at DESC
         `, [userId]);
 
-        // Get recent activities
         const [activities] = await db.execute(`
             SELECT * FROM logs
             WHERE user_id = ?
@@ -232,7 +226,7 @@ const getUserDetail = async (req, res, next) => {
     }
 };
 
-// Update user role
+// Cập nhật vai trò người dùng
 const updateUserRole = async (req, res, next) => {
     try {
         const userId = req.params.id;
@@ -253,7 +247,6 @@ const updateUserRole = async (req, res, next) => {
             });
         }
 
-        // Prevent self-demotion
         if (parseInt(userId) === req.user.id && role !== 'admin') {
             return res.status(400).json({
                 success: false,
@@ -273,7 +266,7 @@ const updateUserRole = async (req, res, next) => {
     }
 };
 
-// Block/Unblock user
+// Khóa/mở khóa người dùng
 const toggleUserStatus = async (req, res, next) => {
     try {
         const userId = req.params.id;
@@ -286,7 +279,6 @@ const toggleUserStatus = async (req, res, next) => {
             });
         }
 
-        // Check if user exists
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({
@@ -295,7 +287,6 @@ const toggleUserStatus = async (req, res, next) => {
             });
         }
 
-        // Prevent self-blocking
         if (parseInt(userId) === req.user.id) {
             return res.status(400).json({
                 success: false,
@@ -303,9 +294,6 @@ const toggleUserStatus = async (req, res, next) => {
             });
         }
 
-        // Add is_blocked column if not exists
-        // For now, we'll use a workaround by updating a custom field
-        // In production, you should add this column to users table
         await db.execute(
             'UPDATE users SET role = ? WHERE id = ?',
             [is_blocked ? 'blocked' : user.role, userId]
@@ -320,7 +308,7 @@ const toggleUserStatus = async (req, res, next) => {
     }
 };
 
-// Delete user
+// Xóa người dùng
 const deleteUser = async (req, res, next) => {
     try {
         const userId = req.params.id;
@@ -333,7 +321,6 @@ const deleteUser = async (req, res, next) => {
             });
         }
 
-        // Prevent self-deletion
         if (parseInt(userId) === req.user.id) {
             return res.status(400).json({
                 success: false,
@@ -352,9 +339,7 @@ const deleteUser = async (req, res, next) => {
     }
 };
 
-// ========== WORKSPACE MONITORING ==========
-
-// Get all workspaces with statistics
+// Lấy tất cả workspace
 const getAllWorkspaces = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -370,13 +355,11 @@ const getAllWorkspaces = async (req, res, next) => {
             params.push(`%${search}%`);
         }
 
-        // Get total count
         const [countResult] = await db.execute(
             `SELECT COUNT(*) as total FROM workspaces w ${whereClause}`,
             params
         );
 
-        // Get workspaces with statistics
         const [workspaces] = await db.execute(`
             SELECT 
                 w.*,
@@ -411,7 +394,7 @@ const getAllWorkspaces = async (req, res, next) => {
     }
 };
 
-// Get workspace detail
+// Lấy chi tiết workspace
 const getWorkspaceDetail = async (req, res, next) => {
     try {
         const workspaceId = req.params.id;
@@ -424,10 +407,8 @@ const getWorkspaceDetail = async (req, res, next) => {
             });
         }
 
-        // Get owner info
         const owner = await User.findById(workspace.owner_id);
 
-        // Get members
         const [members] = await db.execute(`
             SELECT u.*, wm.role, wm.joined_at
             FROM users u
@@ -436,7 +417,7 @@ const getWorkspaceDetail = async (req, res, next) => {
             ORDER BY wm.joined_at ASC
         `, [workspaceId]);
 
-        // Get projects
+        // Lấy danh sách dự án thuộc workspace
         const [projects] = await db.execute(`
             SELECT * FROM prj
             WHERE workspace_id = ?
@@ -465,7 +446,7 @@ const getWorkspaceDetail = async (req, res, next) => {
     }
 };
 
-// Delete workspace
+// Xóa workspace
 const deleteWorkspace = async (req, res, next) => {
     try {
         const workspaceId = req.params.id;
@@ -489,9 +470,9 @@ const deleteWorkspace = async (req, res, next) => {
     }
 };
 
-// ========== ACTIVITY LOGS ==========
+// ========== NHẬT KÝ HOẠT ĐỘNG ==========
 
-// Get activity logs
+// Lấy nhật ký hoạt động
 const getActivityLogs = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -531,13 +512,13 @@ const getActivityLogs = async (req, res, next) => {
             params.push(end_date);
         }
 
-        // Get total count
+        // Lấy tổng số dòng
         const [countResult] = await db.execute(
             `SELECT COUNT(*) as total FROM logs l ${whereClause}`,
             params
         );
 
-        // Get logs
+        // Lấy danh sách log
         const [logs] = await db.execute(`
             SELECT 
                 l.*,
@@ -567,10 +548,10 @@ const getActivityLogs = async (req, res, next) => {
     }
 };
 
-// Get activity statistics
+// Lấy thống kê hoạt động
 const getActivityStats = async (req, res, next) => {
     try {
-        // Actions by type
+        // Hành động theo loại
         const [actionsByType] = await db.execute(`
             SELECT action, COUNT(*) as count
             FROM logs
@@ -578,7 +559,7 @@ const getActivityStats = async (req, res, next) => {
             ORDER BY count DESC
         `);
 
-        // Activities by table
+        // Hoạt động theo bảng dữ liệu
         const [activitiesByTable] = await db.execute(`
             SELECT target_table, COUNT(*) as count
             FROM logs
@@ -586,7 +567,7 @@ const getActivityStats = async (req, res, next) => {
             ORDER BY count DESC
         `);
 
-        // Top active users
+        // Người dùng hoạt động nhiều nhất
         const [topActiveUsers] = await db.execute(`
             SELECT 
                 u.id,
@@ -599,8 +580,7 @@ const getActivityStats = async (req, res, next) => {
             ORDER BY activity_count DESC
             LIMIT 10
         `);
-
-        // Activities timeline (last 30 days)
+        
         const [timeline] = await db.execute(`
             SELECT 
                 DATE(created_at) as date,
@@ -625,15 +605,11 @@ const getActivityStats = async (req, res, next) => {
     }
 };
 
-// ========== SYSTEM SETTINGS ==========
-
-// Get system info
+// Lấy thông tin hệ thống
 const getSystemInfo = async (req, res, next) => {
     try {
-        // Database info
         const [dbInfo] = await db.execute('SELECT VERSION() as version');
-        
-        // Table sizes
+
         const [tableSizes] = await db.execute(`
             SELECT 
                 table_name,
@@ -660,26 +636,16 @@ const getSystemInfo = async (req, res, next) => {
 };
 
 module.exports = {
-    // Dashboard
     getDashboardStats,
-    
-    // User Management
     getAllUsers,
     getUserDetail,
     updateUserRole,
     toggleUserStatus,
     deleteUser,
-    
-    // Workspace Monitoring
     getAllWorkspaces,
     getWorkspaceDetail,
     deleteWorkspace,
-    
-    // Activity Logs
     getActivityLogs,
     getActivityStats,
-    
-    // System Settings
     getSystemInfo
 };
-

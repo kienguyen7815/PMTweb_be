@@ -2,12 +2,10 @@ const User = require('../../models/userModel/User');
 const { generateToken } = require('../../middleware/auth');
 
 class AuthController {
-    // Đăng ký tài khoản mới, không cho phép client tự set role = admin
     static async register(req, res, next) {
         try {
             const { username, email, password, role, phone } = req.body;
 
-            // Tạo user mới, giới hạn role để tránh lỗ hổng bảo mật
             const effectiveRole = role === 'admin' ? 'admin' : 'user';
             const user = await User.create({
                 username,
@@ -45,12 +43,10 @@ class AuthController {
         }
     }
 
-    // Đăng nhập với email và password
     static async login(req, res, next) {
         try {
             const { email, password } = req.body;
 
-            // Kiểm tra đầu vào trước khi xử lý
             if (!email || !password) {
                 return res.status(400).json({
                     success: false,
@@ -58,7 +54,6 @@ class AuthController {
                 });
             }
 
-            // Tìm user theo email để lấy thông tin
             const user = await User.findByEmail(email);
             if (!user) {
                 return res.status(401).json({
@@ -67,7 +62,6 @@ class AuthController {
                 });
             }
 
-            // Xác thực mật khẩu với bcrypt
             const isValidPassword = await user.validatePassword(password);
             if (!isValidPassword) {
                 return res.status(401).json({
@@ -76,7 +70,6 @@ class AuthController {
                 });
             }
 
-            // Tạo JWT token để duy trì phiên đăng nhập
             const token = generateToken(user.id);
 
             res.json({
@@ -96,7 +89,6 @@ class AuthController {
         }
     }
 
-    // Lấy thông tin người dùng hiện tại từ token
     static async getProfile(req, res, next) {
         try {
             const user = await User.findById(req.user.id);
@@ -122,7 +114,6 @@ class AuthController {
         }
     }
 
-    // Cập nhật thông tin cá nhân, không cho phép thay đổi email đã tồn tại
     static async updateProfile(req, res, next) {
         try {
             const { 
@@ -140,7 +131,6 @@ class AuthController {
             } = req.body;
             const userId = req.user.id;
 
-            // Lấy thông tin hiện tại để so sánh
             const currentUser = await User.findById(userId);
             if (!currentUser) {
                 return res.status(404).json({
@@ -149,7 +139,6 @@ class AuthController {
                 });
             }
 
-            // Kiểm tra email mới có bị trùng với user khác không
             if (email && email !== currentUser.email) {
                 const existingUser = await User.findByEmail(email);
                 if (existingUser && existingUser.id !== userId) {
@@ -160,7 +149,6 @@ class AuthController {
                 }
             }
 
-            // Chuẩn bị dữ liệu cần cập nhật
             const updateData = {};
             if (username !== undefined) updateData.username = username;
             if (email !== undefined) updateData.email = email;
@@ -177,14 +165,10 @@ class AuthController {
             if (marital_status !== undefined) updateData.marital_status = marital_status;
             if (ethnicity !== undefined) updateData.ethnicity = ethnicity;
             if (occupation !== undefined) updateData.occupation = occupation;
-            // Avatar được xử lý riêng qua endpoint uploadAvatar
-
-            // Cập nhật vào database nếu có thay đổi
             if (Object.keys(updateData).length > 0) {
                 await currentUser.update(updateData);
             }
 
-            // Lấy lại thông tin sau khi cập nhật để trả về client
             const updatedUser = await User.findById(userId);
 
             res.json({
@@ -199,8 +183,7 @@ class AuthController {
             if (process.env.NODE_ENV === 'development') {
                 console.error('Update profile error:', error);
             }
-            
-            // Xử lý lỗi database
+
             if (error.code === 'ER_DUP_ENTRY') {
                 return res.status(400).json({
                     success: false,
@@ -212,7 +195,6 @@ class AuthController {
         }
     }
 
-    // Đổi mật khẩu, yêu cầu xác thực mật khẩu cũ
     static async changePassword(req, res, next) {
         try {
             const { currentPassword, newPassword } = req.body;
@@ -232,8 +214,7 @@ class AuthController {
             }
 
             const user = await User.findById(req.user.id);
-            
-            // Xác thực mật khẩu hiện tại trước khi đổi
+
             const isValidPassword = await user.validatePassword(currentPassword);
             if (!isValidPassword) {
                 return res.status(400).json({
@@ -242,7 +223,6 @@ class AuthController {
                 });
             }
 
-            // Mã hóa mật khẩu mới bằng bcrypt trước khi lưu
             const bcrypt = require('bcryptjs');
             const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
             const hashedPassword = await bcrypt.hash(newPassword, bcryptRounds);
@@ -262,7 +242,6 @@ class AuthController {
         }
     }
 
-    // Upload ảnh đại diện, xóa ảnh cũ nếu có
     static async uploadAvatar(req, res, next) {
         try {
             if (!req.file) {
@@ -282,7 +261,6 @@ class AuthController {
                 });
             }
 
-            // Xóa file avatar cũ để tiết kiệm dung lượng
             if (user.avatar) {
                 const fs = require('fs');
                 const path = require('path');
@@ -295,12 +273,9 @@ class AuthController {
                 }
             }
 
-            // Lưu tên file vào database để hiển thị sau này
             const avatarPath = req.file.filename;
-            
-            // Validation: đảm bảo filename hợp lệ trước khi lưu
+
             if (!avatarPath || avatarPath.trim() === '') {
-                // Xóa file tạm nếu validation thất bại
                 const fs = require('fs');
                 const path = require('path');
                 const filePath = path.join(__dirname, '../../uploads/avatars', req.file.filename);
@@ -323,14 +298,12 @@ class AuthController {
                 });
             }
 
-            // Cập nhật đường dẫn avatar vào database
             if (process.env.NODE_ENV === 'development') {
                 console.log('Trước khi update - user.avatar:', user.avatar);
                 console.log('avatarPath sẽ được lưu:', avatarPath);
                 console.log('avatarPath type:', typeof avatarPath);
             }
-            
-            // Đảm bảo giá trị hợp lệ trước khi lưu vào database
+
             const avatarValue = String(avatarPath).trim();
             if (!avatarValue) {
                 throw new Error('Đường dẫn avatar không hợp lệ');
@@ -342,7 +315,6 @@ class AuthController {
                 console.log('Sau khi update - user.avatar:', user.avatar);
             }
 
-            // Xác nhận lại bằng cách đọc từ database
             const updatedUser = await User.findById(userId);
             
             if (!updatedUser) {
@@ -356,14 +328,12 @@ class AuthController {
                     expectedAvatar: avatarPath,
                     match: updatedUser.avatar === avatarPath
                 });
-                
-                // Query trực tiếp để debug
+
                 const db = require('../../config/db');
                 const [rows] = await db.execute('SELECT avatar FROM users WHERE id = ?', [userId]);
                 console.log('Query trực tiếp từ database:', rows[0]);
             }
 
-            // Kiểm tra tính nhất quán của dữ liệu
             if (updatedUser.avatar !== avatarPath) {
                 console.error('Lỗi: Avatar không khớp!', {
                     expected: avatarPath,
@@ -386,8 +356,7 @@ class AuthController {
                 console.error('Upload avatar error:', error);
                 console.error('Error stack:', error.stack);
             }
-            
-            // Xóa file tạm nếu upload thất bại
+
             if (req.file) {
                 try {
                     const fs = require('fs');
@@ -403,8 +372,7 @@ class AuthController {
                     console.error('Lỗi khi xóa file:', deleteError);
                 }
             }
-            
-            // Trả về thông báo lỗi chi tiết
+
             const statusCode = error.statusCode || 500;
             const message = error.message || 'Lỗi khi upload avatar';
             

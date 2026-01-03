@@ -15,7 +15,6 @@ const getAll = async (req, res, next) => {
     }
 };
 
-// Get projects for current user (with permission filtering)
 const getMyProjects = async (req, res, next) => {
     try {
         // Check and update expired projects before fetching
@@ -27,14 +26,10 @@ const getMyProjects = async (req, res, next) => {
         
         let projects;
         
-        // Trong workspace context
         if (workspaceId) {
-            // Nếu user là member của workspace, cho phép xem tất cả projects trong workspace
-            // Điều này cho phép member chat và collaborate trong tất cả projects
             projects = await Project.findAll(workspaceId);
         } else {
-            // Global context (không có workspace)
-            // PM và Admin có thể xem tất cả projects
+
             if (currentRole === 'ad' || currentRole === 'pm') {
                 projects = await Project.findAll();
             } else {
@@ -62,9 +57,7 @@ const getById = async (req, res, next) => {
         if (!project) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy dự án' });
         }
-        
-        // Nếu project có workspace_id và user đang trong workspace context
-        // Kiểm tra xem project có thuộc workspace đó không
+
         if (project.workspace_id && req.workspaceId) {
             if (project.workspace_id !== req.workspaceId) {
                 return res.status(403).json({
@@ -236,9 +229,7 @@ const update = async (req, res, next) => {
         if (!project) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy dự án' });
         }
-        
-        // Nếu project có workspace_id và user đang trong workspace context
-        // Kiểm tra xem project có thuộc workspace đó không
+
         if (project.workspace_id && req.workspaceId) {
             if (project.workspace_id !== req.workspaceId) {
                 return res.status(403).json({
@@ -388,9 +379,7 @@ const remove = async (req, res, next) => {
         if (!project) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy dự án' });
         }
-        
-        // Nếu project có workspace_id và user đang trong workspace context
-        // Kiểm tra xem project có thuộc workspace đó không
+
         if (project.workspace_id && req.workspaceId) {
             if (project.workspace_id !== req.workspaceId) {
                 return res.status(403).json({

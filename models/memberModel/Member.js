@@ -12,7 +12,13 @@ class Member {
         this.updated_at = data.updated_at;
     }
 
-    // Tạo member mới
+    /**
+     * Tạo member mới cho workspace.
+     * @param {Object} memberData - Dữ liệu member: name, email, date_of_birth, occupation, workspace_id
+     * @returns {Promise<Member>} - Member vừa tạo
+     * 
+     * Tóm tắt: Tạo member mới, kiểm tra email không trùng trong workspace, trả về instance Member.
+     */
     static async create(memberData) {
         try {
             const { name, email, date_of_birth, occupation, workspace_id = null } = memberData;
@@ -42,7 +48,14 @@ class Member {
         }
     }
 
-    // Tìm member theo email (có thể lọc theo workspace)
+    /**
+     * Tìm member theo email (có thể lọc theo workspace).
+     * @param {string} email
+     * @param {number|null} workspaceId
+     * @returns {Promise<Member|null>}
+     * 
+     * Tóm tắt: Lấy về member có email và workspace cụ thể (nếu có workspaceId).
+     */
     static async findByEmail(email, workspaceId = null) {
         try {
             let query = 'SELECT * FROM members WHERE email = ?';
@@ -66,7 +79,13 @@ class Member {
         }
     }
 
-    // Tìm member theo ID
+    /**
+     * Tìm member theo ID.
+     * @param {number} id 
+     * @returns {Promise<Member|null>}
+     * 
+     * Tóm tắt: Trả về member theo id (nếu có).
+     */
     static async findById(id) {
         try {
             const query = 'SELECT * FROM members WHERE id = ?';
@@ -82,7 +101,14 @@ class Member {
         }
     }
 
-    // Lấy tất cả members (có thể lọc theo role của user hiện tại)
+    /**
+     * Lấy tất cả members (có thể lọc theo workspace).
+     * @param {string|null} currentUserRole - Vai trò user hiện tại (không sử dụng nếu không truyền)
+     * @param {number|null} workspaceId - Lọc members theo workspace (nếu có)
+     * @returns {Promise<Member[]>}
+     * 
+     * Tóm tắt: Lấy danh sách tất cả member, có thể giới hạn theo workspace.
+     */
     static async findAll(currentUserRole = null, workspaceId = null) {
         try {
             let query = 'SELECT * FROM members';
@@ -95,12 +121,6 @@ class Member {
             }
 
             query += ' ORDER BY created_at DESC';
-
-            // Lọc theo role nếu có (logic nghiệp vụ)
-            // Admin: hiển thị toàn bộ
-            // PM: hiển thị tất cả (vì members không có role)
-            // Team Leader: hiển thị tất cả
-            // Member: không có quyền (sẽ bị chặn ở middleware)
             
             const [rows] = await db.execute(query, params);
             
@@ -110,7 +130,13 @@ class Member {
         }
     }
 
-    // Cập nhật thông tin member
+    /**
+     * Cập nhật thông tin member.
+     * @param {Object} updateData - Dữ liệu cập nhật (name, email, date_of_birth, occupation)
+     * @returns {Promise<void>}
+     * 
+     * Tóm tắt: Cập nhật các trường cho member hiện tại, chỉ các trường cho phép.
+     */
     async update(updateData) {
         try {
             const allowedFields = ['name', 'email', 'date_of_birth', 'occupation'];
@@ -149,7 +175,12 @@ class Member {
         }
     }
 
-    // Xóa member
+    /**
+     * Xóa member khỏi hệ thống.
+     * @returns {Promise<void>}
+     * 
+     * Tóm tắt: Xóa member này khỏi bảng members.
+     */
     async delete() {
         try {
             const query = 'DELETE FROM members WHERE id = ?';
@@ -159,7 +190,12 @@ class Member {
         }
     }
 
-    // Lấy thông tin member (không bao gồm sensitive data)
+    /**
+     * Lấy thông tin member ở dạng xuất JSON (không bao gồm dữ liệu nhạy cảm).
+     * @returns {Object}
+     * 
+     * Tóm tắt: Trả về thông tin member cơ bản, ẩn các trường nhạy cảm.
+     */
     toJSON() {
         return {
             id: this.id,
@@ -176,7 +212,15 @@ class Member {
         };
     }
 
-    // Tìm kiếm members theo email pattern
+    /**
+     * Tìm kiếm members theo pattern email (có thể lọc theo workspace, giới hạn số lượng).
+     * @param {string} pattern - Chuỗi tìm kiếm (có thể là một phần email)
+     * @param {number} limit - Số lượng tối đa trả về (mặc định 10)
+     * @param {number|null} workspaceId - Lọc theo workspace nếu có
+     * @returns {Promise<Member[]>}
+     * 
+     * Tóm tắt: Trả về danh sách member khớp email pattern, lọc workspace, không trả quá limit.
+     */
     static async searchByEmail(pattern, limit = 10, workspaceId = null) {
         try {
             const searchPattern = `%${pattern.trim()}%`;
@@ -200,7 +244,3 @@ class Member {
             throw error;
         }
     }
-}
-
-module.exports = Member;
-

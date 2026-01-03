@@ -1,13 +1,13 @@
 const TaskAssignment = require('../../models/taskAssignmentModel/TaskAssignment');
 
-// Get tasks assigned to current user
+// Lấy danh sách task được giao cho user hiện tại
 const getMyTasks = async (req, res, next) => {
     try {
         const userId = req.user.id;
         const workspaceId = req.workspaceId;
         let tasks;
 
-        // Nếu có workspace context -> chỉ lấy các task thuộc projects trong workspace đó
+        // Nếu có workspace context -> chỉ lấy các task thuộc các project trong workspace đó
         if (workspaceId) {
             const db = require('../../config/db');
             const query = `
@@ -27,7 +27,7 @@ const getMyTasks = async (req, res, next) => {
             const [rows] = await db.execute(query, [userId, workspaceId]);
             tasks = rows;
         } else {
-            // Không có workspace context -> giữ behavior cũ (tất cả task được assign)
+            // Không có workspace context -> lấy tất cả task được giao
             tasks = await TaskAssignment.findByUserId(userId);
         }
         res.json({ success: true, data: tasks });
@@ -36,7 +36,7 @@ const getMyTasks = async (req, res, next) => {
     }
 };
 
-// Assign task to user(s)
+// Giao task cho user (hoặc nhiều user)
 const assignTask = async (req, res, next) => {
     try {
         const { task_id, user_ids } = req.body;
@@ -77,7 +77,7 @@ const assignTask = async (req, res, next) => {
     }
 };
 
-// Get assignments for a task
+// Lấy danh sách assignment của một task
 const getTaskAssignments = async (req, res, next) => {
     try {
         const { taskId } = req.params;
@@ -100,7 +100,7 @@ const getTaskAssignments = async (req, res, next) => {
                 if (project.workspace_id !== req.workspaceId) {
                     return res.status(403).json({
                         success: false,
-                        message: 'Bạn không có quyền xem assignments của task này'
+                        message: 'Bạn không có quyền xem danh sách assignment của task này'
                     });
                 }
             }
@@ -113,7 +113,7 @@ const getTaskAssignments = async (req, res, next) => {
     }
 };
 
-// Remove assignment
+// Xóa assignment theo id assignment
 const removeAssignment = async (req, res, next) => {
     try {
         const { id } = req.params;
@@ -128,7 +128,7 @@ const removeAssignment = async (req, res, next) => {
     }
 };
 
-// Remove assignment by task and user
+// Xóa assignment theo task và user
 const removeAssignmentByTaskAndUser = async (req, res, next) => {
     try {
         const { taskId, userId } = req.params;
