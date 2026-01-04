@@ -14,7 +14,7 @@ const getProjectComments = async (req, res, next) => {
 // Tạo bình luận cho dự án
 const createComment = async (req, res, next) => {
     try {
-        const { project_id, comment } = req.body;
+        const { project_id, comment } = req.body;x``
         const user_id = req.user.id;
 
         if (!project_id || !comment || !comment.trim()) {

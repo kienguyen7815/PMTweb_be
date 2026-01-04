@@ -547,7 +547,6 @@ const generateTaskSuggestions = async (req, res, next) => {
 
 		let projectInfo = `Tên dự án: ${project_name.trim()}`;
 
-		// Thêm các trường context nếu có bổ sung
 		if (project_context) {
 			if (project_context.description) {
 				projectInfo += `\nMô tả: ${project_context.description}`;

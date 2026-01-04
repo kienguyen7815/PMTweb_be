@@ -143,16 +143,7 @@ const create = async (req, res, next) => {
             });
         }
         
-        // Kiểm tra email đã tồn tại trong workspace này chưa
-        const existingMember = await Member.findByEmail(email.trim(), workspaceId);
-        if (existingMember) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'Email này đã được sử dụng trong workspace này' 
-            });
-        }
-        
-        // Tạo member mới, gắn với workspace hiện tại (nếu có)
+        // Tạo member mới, gắn với workspace hiện tại
         const member = await Member.create({
             workspace_id: workspaceId,
             name: name.trim(),
@@ -210,14 +201,7 @@ const create = async (req, res, next) => {
         if (process.env.NODE_ENV === 'development') {
             console.error('Error creating member:', error);
         }
-        
-        if (error.message === 'Email đã được sử dụng') {
-            return res.status(400).json({
-                success: false,
-                message: error.message
-            });
-        }
-        
+                
         next(error);
     }
 };

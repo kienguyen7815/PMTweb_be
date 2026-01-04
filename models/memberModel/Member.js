@@ -17,18 +17,13 @@ class Member {
      * @param {Object} memberData - Dữ liệu member: name, email, date_of_birth, occupation, workspace_id
      * @returns {Promise<Member>} - Member vừa tạo
      * 
-     * Tóm tắt: Tạo member mới, kiểm tra email không trùng trong workspace, trả về instance Member.
+     * Tóm tắt: Tạo member mới, cho phép cùng email tham gia nhiều workspace khác nhau, trả về instance Member.
      */
     static async create(memberData) {
         try {
             const { name, email, date_of_birth, occupation, workspace_id = null } = memberData;
             
-            // Kiểm tra email đã tồn tại trong workspace này chưa
-            const existingMember = await this.findByEmail(email, workspace_id);
-            if (existingMember) {
-                throw new Error('Email đã được sử dụng trong workspace này');
-            }
-
+            // Cho phép cùng một email tham gia nhiều workspace khác nhauư
             const query = `
                 INSERT INTO members (workspace_id, name, email, date_of_birth, occupation) 
                 VALUES (?, ?, ?, ?, ?)
@@ -244,3 +239,6 @@ class Member {
             throw error;
         }
     }
+}
+
+module.exports = Member;

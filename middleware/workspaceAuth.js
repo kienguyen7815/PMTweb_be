@@ -1,10 +1,6 @@
 const WorkspaceMember = require('../models/workspaceModel/WorkspaceMember');
 
-/**
- * Lấy role của user trong workspace cụ thể để phân quyền chính xác
- * Workspace ID có thể lấy từ body, query, params hoặc header
- * Nếu không có workspace_id, có thể lấy từ project_id
- */
+
 const getWorkspaceRole = async (req, res, next) => {
     try {
         // Thử lấy workspace_id từ nhiều nguồn khác nhau

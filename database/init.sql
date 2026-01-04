@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS members (
     id INT AUTO_INCREMENT PRIMARY KEY,
     workspace_id INT NULL,
     name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL,
     date_of_birth DATE,
     occupation VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
