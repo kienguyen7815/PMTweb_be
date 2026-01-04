@@ -73,10 +73,8 @@ const SDLC_PHASES = {
 		"Vận hành & cải tiến - Fix bug, theo dõi hệ thống, tối ưu và nâng cấp tính năng",
 };
 
-// Danh sách phase chuẩn dùng để validate
 const VALID_PHASES = Object.keys(SDLC_PHASES);
 
-// Template mẫu JSON array tasks gửi cho AI để format đúng mong muốn
 const JSON_TEMPLATE = `[
   {
     "name": "Tên task ngắn gọn",
@@ -84,8 +82,6 @@ const JSON_TEMPLATE = `[
     "phase": "Requirement Analysis"
   }
 ]`;
-
-// ================== HELPER FUNCTIONS ==================
 
 // Hàm loại bỏ định dạng Markdown trong text trả về từ AI
 const removeMarkdown = (text) => {
@@ -339,7 +335,6 @@ const normalizeHistory = (messages) => {
 	return history;
 };
 
-// ================== MAIN HANDLERS (Xử lý endpoints chính) ==================
 
 // Xử lý hội thoại AI và trả lời cho người dùng (gửi/nhận messages)
 const chatWithAI = async (req, res, next) => {
