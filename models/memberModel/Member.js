@@ -244,3 +244,5 @@ class Member {
             throw error;
         }
     }
+}
+module.exports = Member;
